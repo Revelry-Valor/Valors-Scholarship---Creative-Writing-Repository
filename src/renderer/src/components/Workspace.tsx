@@ -16,6 +16,7 @@ import { ViewPage } from '../charts/ViewPage';
 import { KeyDetailsPage } from './KeyDetails';
 import { LibraryReader, importToLibrary } from './Library';
 import { ReviewPage, SuggestBadge, TriggerWordsPage, openReview } from './Review';
+import { ResearchPane, ResearchSplitter } from './Research';
 import { SpellingSettings } from './SpellingSettings';
 import { setSpellingPrefs } from '../editor/spelling';
 import { newView, addType } from './ViewsSidebar';
@@ -28,7 +29,10 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
   const [navOpen, setNavOpen] = useState(false);
   const [cmdMenu, setCmdMenu] = useState<MenuSpec>(null);
   useEffect(() => {
-    api.getPrefs().then(setSpellingPrefs).catch(() => undefined);
+    api
+      .getPrefs()
+      .then(setSpellingPrefs)
+      .catch(() => undefined);
   }, []);
   const openSpelling = useCallback(() => dialogs.show((close) => <SpellingSettings onClose={() => close(null)} />), [dialogs]);
   useEffect(() => setNavOpen(false), [app.active]);
@@ -39,10 +43,21 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
     async (presetName?: string) => {
       const type = await dialogs.pick({
         title: presetName ? `Create “${presetName}” as…` : 'New entity — pick a type',
-        items: app.nameData.templates.map((x) => ({ label: x.name, detail: x.sections.slice(0, 4).join(' · '), value: x.id, color: x.color })),
+        items: app.nameData.templates.map((x) => ({
+          label: x.name,
+          detail: x.sections.slice(0, 4).join(' · '),
+          value: x.id,
+          color: x.color,
+        })),
       });
       if (!type) return;
-      const name = presetName ?? (await dialogs.prompt({ title: `New ${app.templates.get(type)?.name ?? type}`, placeholder: 'Name', okLabel: 'Create' }));
+      const name =
+        presetName ??
+        (await dialogs.prompt({
+          title: `New ${app.templates.get(type)?.name ?? type}`,
+          placeholder: 'Name',
+          okLabel: 'Create',
+        }));
       if (!name) return;
       try {
         const chip = await api.createEntity({ name, type });
@@ -56,7 +71,11 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
   );
 
   const newEntry = useCallback(async () => {
-    const title = await dialogs.prompt({ title: 'New document', placeholder: 'Title', okLabel: 'Create' });
+    const title = await dialogs.prompt({
+      title: 'New document',
+      placeholder: 'Title',
+      okLabel: 'Create',
+    });
     if (!title) return;
     const e = await api.createEntry({ title });
     app.openTab({ kind: 'entry', id: e.id });
@@ -69,7 +88,12 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
 
   const setAuthor = useCallback(async () => {
     const st = await api.appState();
-    const name = await dialogs.prompt({ title: 'Your name', label: 'Every block you write is signed with this name (spec: authorship is recorded from day one).', initial: st.author, okLabel: 'Save' });
+    const name = await dialogs.prompt({
+      title: 'Your name',
+      label: 'Every block you write is signed with this name (spec: authorship is recorded from day one).',
+      initial: st.author,
+      okLabel: 'Save',
+    });
     if (name) {
       await api.setAuthor(name);
       app.notify(`Signing new blocks as ${name}`);
@@ -85,27 +109,114 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
   const commands: Command[] = useMemo(
     () => [
       { id: 'new-entry', label: 'New document', hint: 'Ctrl+N', run: newEntry },
-      { id: 'new-entity', label: 'New entity', hint: 'Ctrl+Shift+E', run: () => newEntity() },
-      { id: 'search', label: 'Search all writing', hint: 'Ctrl+Shift+F', run: () => app.openTab({ kind: 'search', query: '' }) },
-      { id: 'goto', label: 'Go to entry or entity', hint: 'Ctrl+O', run: () => setTimeout(() => setPalette('switch'), 0) },
-      { id: 'ref', label: 'Toggle markup quick reference', hint: 'F1', run: toggleReference },
-      { id: 'context', label: 'Toggle “This block” panel', hint: 'Ctrl+\\', run: () => app.setPanels({ right: app.panels.right ? null : 'context' }) },
-      { id: 'focus', label: app.focusMode ? 'Leave focus mode' : 'Focus mode (hide panels)', hint: 'Ctrl+Shift+Enter', run: () => app.setFocusMode(!app.focusMode) },
-      { id: 'raw', label: app.rawMarkup ? 'Show chips (hide raw markup)' : 'Show raw markup', hint: 'Ctrl+E', run: () => app.setRawMarkup(!app.rawMarkup) },
-      { id: 'close-tab', label: 'Close tab', hint: 'Ctrl+W', run: () => app.active && app.closeTab(app.active) },
-      { id: 'theme', label: `Theme: ${theme} → ${theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system'}`, run: cycleTheme },
-      { id: 'import', label: 'Import into the Library (Bibles, works, articles)…', run: () => importToLibrary(app, dialogs) },
-      { id: 'review', label: 'Review suggestions: names, trigger words and key statements to file', run: () => openReview(app, { writing: true }, 'All my writing') },
-      { id: 'suggest-panel', label: 'Suggestions for this document (right bar)', hint: 'Ctrl+Shift+A', run: () => app.setPanels({ right: 'suggest' }) },
-      { id: 'triggers', label: 'Edit trigger words (canon, prophecy, baptism…)', run: () => app.openTab({ kind: 'triggers' }) },
-      { id: 'key-details', label: 'Key details: everything marked important or to check', run: () => app.openTab({ kind: 'marks' }) },
-      { id: 'new-view', label: 'New timeline or tree (family, lineage, tech, radial, web)…', run: () => newView(app, dialogs) },
-      { id: 'add-type', label: 'Add a type (Settlement, Race, Species, Flora, Fauna, Technology…)', run: () => addType(app, dialogs) },
+      {
+        id: 'new-entity',
+        label: 'New entity',
+        hint: 'Ctrl+Shift+E',
+        run: () => newEntity(),
+      },
+      {
+        id: 'search',
+        label: 'Search all writing',
+        hint: 'Ctrl+Shift+F',
+        run: () => app.openTab({ kind: 'search', query: '' }),
+      },
+      {
+        id: 'goto',
+        label: 'Go to entry or entity',
+        hint: 'Ctrl+O',
+        run: () => setTimeout(() => setPalette('switch'), 0),
+      },
+      {
+        id: 'ref',
+        label: 'Toggle markup quick reference',
+        hint: 'F1',
+        run: toggleReference,
+      },
+      {
+        id: 'context',
+        label: 'Toggle “This block” panel',
+        hint: 'Ctrl+\\',
+        run: () => app.setPanels({ right: app.panels.right ? null : 'context' }),
+      },
+      {
+        id: 'focus',
+        label: app.focusMode ? 'Leave focus mode' : 'Focus mode (hide panels)',
+        hint: 'Ctrl+Shift+Enter',
+        run: () => app.setFocusMode(!app.focusMode),
+      },
+      {
+        id: 'raw',
+        label: app.rawMarkup ? 'Show chips (hide raw markup)' : 'Show raw markup',
+        hint: 'Ctrl+E',
+        run: () => app.setRawMarkup(!app.rawMarkup),
+      },
+      {
+        id: 'close-tab',
+        label: 'Close tab',
+        hint: 'Ctrl+W',
+        run: () => app.active && app.closeTab(app.active),
+      },
+      {
+        id: 'theme',
+        label: `Theme: ${theme} → ${theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system'}`,
+        run: cycleTheme,
+      },
+      {
+        id: 'import',
+        label: 'Import into the Library (Bibles, works, articles)…',
+        run: () => importToLibrary(app, dialogs),
+      },
+      {
+        id: 'review',
+        label: 'Review suggestions: names, trigger words and key statements to file',
+        run: () => openReview(app, { writing: true }, 'All my writing'),
+      },
+      {
+        id: 'suggest-panel',
+        label: 'Suggestions for this document (right bar)',
+        hint: 'Ctrl+Shift+A',
+        run: () => app.setPanels({ right: 'suggest' }),
+      },
+      {
+        id: 'research',
+        label: 'Research: look something up in the Library beside your page',
+        hint: 'Ctrl+Shift+L',
+        run: () => app.setPanels({ research: true }),
+      },
+      {
+        id: 'triggers',
+        label: 'Edit trigger words (canon, prophecy, baptism…)',
+        run: () => app.openTab({ kind: 'triggers' }),
+      },
+      {
+        id: 'key-details',
+        label: 'Key details: everything marked important or to check',
+        run: () => app.openTab({ kind: 'marks' }),
+      },
+      {
+        id: 'new-view',
+        label: 'New timeline or tree (family, lineage, tech, radial, web)…',
+        run: () => newView(app, dialogs),
+      },
+      {
+        id: 'add-type',
+        label: 'Add a type (Settlement, Race, Species, Flora, Fauna, Technology…)',
+        run: () => addType(app, dialogs),
+      },
       {
         id: 'template',
         label: 'Edit a template (facts and sections)…',
         run: async () => {
-          const type = await dialogs.pick({ title: 'Edit which template?', items: app.nameData.templates.map((t) => ({ label: t.name, detail: `${t.fields.length} facts · ${t.sections.length} sections`, value: t.id, color: t.color })) });
+          const type = await dialogs.pick({
+            title: 'Edit which template?',
+            items: app.nameData.templates.map((t) => ({
+              label: t.name,
+              detail: `${t.fields.length} facts · ${t.sections.length} sections`,
+              value: t.id,
+              color: t.color,
+            })),
+          });
           if (type) await dialogs.show((close) => <TemplateEditor typeId={type} onClose={() => close(null)} />);
         },
       },
@@ -119,7 +230,11 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
         },
       },
       { id: 'spelling', label: 'Spelling & autocorrect…', run: openSpelling },
-      { id: 'author', label: 'Set your name (block signatures)', run: setAuthor },
+      {
+        id: 'author',
+        label: 'Set your name (block signatures)',
+        run: setAuthor,
+      },
       {
         id: 'rebuild',
         label: 'Rebuild index',
@@ -129,7 +244,11 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
           await app.refreshNames();
         },
       },
-      { id: 'reveal', label: 'Show vault folder on disk', run: async () => app.notify(`Vault folder: ${await api.revealInFolder()}`) },
+      {
+        id: 'reveal',
+        label: 'Show vault folder on disk',
+        run: async () => app.notify(`Vault folder: ${await api.revealInFolder()}`),
+      },
       { id: 'switch', label: 'Switch project…', run: onCloseVault },
       ...(window.__lrBackend
         ? [
@@ -175,7 +294,11 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
       else if (mod && !e.shiftKey && k === 'n') newEntry();
       else if (mod && e.shiftKey && k === 'e') newEntity();
       else if (mod && e.shiftKey && k === 'f') app.openTab({ kind: 'search', query: '' });
-      else if (mod && e.shiftKey && k === 'a') app.setPanels({ right: app.panels.right === 'suggest' ? null : 'suggest' });
+      else if (mod && e.shiftKey && k === 'l') app.setPanels(app.panels.research ? { research: false } : { research: true, right: null });
+      else if (mod && e.shiftKey && k === 'a')
+        app.setPanels({
+          right: app.panels.right === 'suggest' ? null : 'suggest',
+        });
       else if (mod && !e.shiftKey && k === 'e') app.setRawMarkup(!app.rawMarkup);
       else if (mod && e.key === '\\') app.setPanels({ right: app.panels.right ? null : 'context' });
       else if (mod && e.shiftKey && e.key === 'Enter') app.setFocusMode(!app.focusMode);
@@ -249,10 +372,17 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
             <button className={`top-btn ${activeTab?.kind === 'marks' ? 'on' : ''}`} title="Everything you marked important or to check" onClick={() => app.openTab({ kind: 'marks' })}>
               ★ Key details
             </button>
+            <button className={`top-btn ${app.panels.research ? 'on' : ''}`} title="Look something up in your Library beside the page (Ctrl+Shift+L)" onClick={() => app.setPanels(app.panels.research ? { research: false } : { research: true, right: null })}>
+              ❡ Research
+            </button>
             <button
               className={`top-btn ${activeTab?.kind === 'review' || app.panels.right === 'suggest' ? 'on' : ''}`}
               title="What the active scan found in this document (Ctrl+Shift+A). Double-click for the full review."
-              onClick={() => app.setPanels({ right: app.panels.right === 'suggest' ? null : 'suggest' })}
+              onClick={() =>
+                app.setPanels({
+                  right: app.panels.right === 'suggest' ? null : 'suggest',
+                })
+              }
               onDoubleClick={() => openReview(app, { writing: true }, 'All my writing')}
             >
               ✦ Suggest
@@ -263,7 +393,15 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
               title="Every command, with its keyboard shortcut"
               onClick={(e) => {
                 const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                setCmdMenu({ x: r.right - 300, y: r.bottom + 4, items: commands.map((c) => ({ label: c.label, hint: c.hint, run: c.run })) });
+                setCmdMenu({
+                  x: r.right - 300,
+                  y: r.bottom + 4,
+                  items: commands.map((c) => ({
+                    label: c.label,
+                    hint: c.hint,
+                    run: c.run,
+                  })),
+                });
               }}
             >
               ☰ Commands ▾
@@ -271,25 +409,47 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
             <button
               className={`top-btn ${app.panels.right === 'reference' ? 'on' : ''}`}
               title="Markup and keyboard reference (F1)"
-              onClick={() => app.setPanels({ right: app.panels.right === 'reference' ? null : 'reference' })}
+              onClick={() =>
+                app.setPanels({
+                  right: app.panels.right === 'reference' ? null : 'reference',
+                })
+              }
             >
               ? Guide
             </button>
-            <button className={`top-btn ${app.panels.right === 'context' ? 'on' : ''}`} title="Where the paragraph at the cursor is filed (Ctrl+\\)" onClick={() => app.setPanels({ right: app.panels.right === 'context' ? null : 'context' })}>
+            <button
+              className={`top-btn ${app.panels.right === 'context' ? 'on' : ''}`}
+              title="Where the paragraph at the cursor is filed (Ctrl+\\)"
+              onClick={() =>
+                app.setPanels({
+                  right: app.panels.right === 'context' ? null : 'context',
+                })
+              }
+            >
               ◧ Block
             </button>
           </div>
         </div>
-        <div className="doc-area">
-          {activeTab?.kind === 'entry' && <EntryView key={activeTab.key} id={activeTab.id} focusBlock={activeTab.focusBlock} />}
-          {activeTab?.kind === 'entity' && <ProfileView key={activeTab.key} id={activeTab.id} focusBlock={activeTab.focusBlock} />}
-          {activeTab?.kind === 'search' && <SearchView query={activeTab.query} />}
-          {activeTab?.kind === 'view' && <ViewPage key={activeTab.key} id={activeTab.id} />}
-          {activeTab?.kind === 'marks' && <KeyDetailsPage />}
-          {activeTab?.kind === 'review' && <ReviewPage key={JSON.stringify(activeTab.scope)} scope={activeTab.scope} label={activeTab.label} />}
-          {activeTab?.kind === 'triggers' && <TriggerWordsPage />}
-          {activeTab?.kind === 'library' && <LibraryReader key={activeTab.key} id={activeTab.id} focusBlock={activeTab.focusBlock} />}
-          {!activeTab && <Welcome onNewEntry={newEntry} onNewEntity={() => newEntity()} onGoto={() => setPalette('switch')} />}
+        <div className="doc-split">
+          <div className="doc-area">
+            {activeTab?.kind === 'entry' && <EntryView key={activeTab.key} id={activeTab.id} focusBlock={activeTab.focusBlock} />}
+            {activeTab?.kind === 'entity' && <ProfileView key={activeTab.key} id={activeTab.id} focusBlock={activeTab.focusBlock} />}
+            {activeTab?.kind === 'search' && <SearchView query={activeTab.query} />}
+            {activeTab?.kind === 'view' && <ViewPage key={activeTab.key} id={activeTab.id} />}
+            {activeTab?.kind === 'marks' && <KeyDetailsPage />}
+            {activeTab?.kind === 'review' && <ReviewPage key={JSON.stringify(activeTab.scope)} scope={activeTab.scope} label={activeTab.label} />}
+            {activeTab?.kind === 'triggers' && <TriggerWordsPage />}
+            {activeTab?.kind === 'library' && <LibraryReader key={activeTab.key} id={activeTab.id} focusBlock={activeTab.focusBlock} />}
+            {!activeTab && <Welcome onNewEntry={newEntry} onNewEntity={() => newEntity()} onGoto={() => setPalette('switch')} />}
+          </div>
+          {app.panels.research && !app.focusMode && (
+            <>
+              <ResearchSplitter />
+              <aside className="research-pane" style={{ width: app.panels.researchWidth ?? 520 }} aria-label="Research">
+                <ResearchPane />
+              </aside>
+            </>
+          )}
         </div>
       </div>
       <RightPanel />
@@ -344,7 +504,9 @@ function Welcome({ onNewEntry, onNewEntity, onGoto }: { onNewEntry: () => void; 
     <div className="welcome">
       <h1>{app.info.settings.name}</h1>
       <p className="muted">
-        {c.entries} entr{c.entries === 1 ? 'y' : 'ies'} · {c.entities} entit{c.entities === 1 ? 'y' : 'ies'} · {c.blocks} block{c.blocks === 1 ? '' : 's'}
+        {c.entries} entr{c.entries === 1 ? 'y' : 'ies'} · {c.entities} entit
+        {c.entities === 1 ? 'y' : 'ies'} · {c.blocks} block
+        {c.blocks === 1 ? '' : 's'}
       </p>
       <div className="welcome-actions">
         <button className="welcome-card" onClick={onNewEntry}>
@@ -383,7 +545,12 @@ function Welcome({ onNewEntry, onNewEntity, onGoto }: { onNewEntry: () => void; 
 function StatusBar({ onAuthor, theme, onTheme, onSpelling }: { onAuthor: () => void; theme: Theme; onTheme: () => void; onSpelling: () => void }) {
   const app = useApp();
   const c = app.info.counts;
-  const saveLabel = { saved: 'Saved', saving: 'Saving…', unsaved: 'Editing…', error: 'Save failed' }[app.saveState];
+  const saveLabel = {
+    saved: 'Saved',
+    saving: 'Saving…',
+    unsaved: 'Editing…',
+    error: 'Save failed',
+  }[app.saveState];
   return (
     <footer className="statusbar">
       <span className={`save-state save-${app.saveState}`}>{saveLabel}</span>
@@ -395,7 +562,15 @@ function StatusBar({ onAuthor, theme, onTheme, onSpelling }: { onAuthor: () => v
       <button className={`status-btn ${app.rawMarkup ? 'on' : ''}`} onClick={() => app.setRawMarkup(!app.rawMarkup)} title="Ctrl+E">
         {app.rawMarkup ? 'Raw markup' : 'Chips'}
       </button>
-      <button className="status-btn" onClick={() => app.setPanels({ right: app.panels.right === 'reference' ? null : 'reference' })} title="F1">
+      <button
+        className="status-btn"
+        onClick={() =>
+          app.setPanels({
+            right: app.panels.right === 'reference' ? null : 'reference',
+          })
+        }
+        title="F1"
+      >
         Markup help
       </button>
       <button className="status-btn" onClick={onSpelling} title="Spelling & autocorrect">

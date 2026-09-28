@@ -7,6 +7,7 @@
 //   settings.yaml   vault settings
 //   binder.yaml     manual ordering of the binder
 //   triggers.yaml   trigger-word themes for the active scan
+//   research.yaml   saved research lookups
 //   .meta/          block authorship and history (keep)
 //   .index/         generated, safe to delete
 //
@@ -64,6 +65,17 @@ export interface ScanScope {
   library?: boolean;
   writing?: boolean;
   all?: boolean;
+}
+
+/** A lookup you keep coming back to ("Canon of Scripture across the Fathers"). */
+export interface SavedLookup {
+  name: string;
+  text: string;
+  concept?: string;
+  scope?: ScanScope;
+  matchAll?: boolean;
+  /** Other projects whose Library is searched too. */
+  projects?: string[];
 }
 
 export const VAULT_MARKER = 'settings.yaml';
@@ -1279,6 +1291,35 @@ export class Vault {
     return this.exclusive(async () => {
       await this.toTrash(`views/${id}.yaml`);
       this.emit({ files: [`views/${id}.yaml`], entities: false, binder: true });
+    });
+  }
+
+  // ---------------------------------------------------------------- saved lookups (research.yaml)
+
+  async listLookups(): Promise<SavedLookup[]> {
+    try {
+      const d = YAML.parse(await fs.readFile(this.abs('research.yaml'), 'utf8')) as { lookups?: SavedLookup[] };
+      return (d?.lookups ?? []).filter((l) => l?.name);
+    } catch {
+      return [];
+    }
+  }
+
+  saveLookup(l: SavedLookup) {
+    return this.exclusive(async () => {
+      const list = (await this.listLookups()).filter((x) => x.name !== l.name);
+      list.push({ ...l, name: l.name.trim() });
+      list.sort((a, b) => a.name.localeCompare(b.name));
+      await this.writeRel('research.yaml', YAML.stringify({ lookups: list }));
+      return list;
+    });
+  }
+
+  deleteLookup(name: string) {
+    return this.exclusive(async () => {
+      const list = (await this.listLookups()).filter((x) => x.name !== name);
+      await this.writeRel('research.yaml', YAML.stringify({ lookups: list }));
+      return list;
     });
   }
 

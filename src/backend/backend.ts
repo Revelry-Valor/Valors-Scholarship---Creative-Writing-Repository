@@ -13,6 +13,8 @@ import { DEFAULT_AUTOCORRECT, NAME_STOPWORDS, type AutocorrectPrefs } from '../c
 import type { EntryStatus, TemplateDef, ViewDef } from '../core/types';
 import { buildGraph, buildTimeline } from '../core/graph';
 import type { TriggerTheme } from '../core/triggers';
+import { lookup, quoteFor, type LookupQuery, type LookupResult } from '../core/lookup';
+import type { SavedLookup } from '../core/vault';
 
 export interface RecentVault {
   path: string;
@@ -41,6 +43,8 @@ export class Backend {
   private listeners = new Set<(e: BackendEvent) => void>();
   private unsub: (() => void) | null = null;
   private timers = new Map<string, ReturnType<typeof setTimeout>>();
+  /** Other projects opened read-only for cross-project lookups. */
+  private others = new Map<string, { vault: Vault; at: number }>();
 
   constructor(
     private configDir: string,
@@ -197,6 +201,29 @@ export class Backend {
     getTriggers: async () => this.v().getTriggers(),
     saveTriggers: async (themes: TriggerTheme[]) => this.v().saveTriggers(themes),
     resetTriggers: async () => this.v().resetTriggers(),
+    lookup: async (q: LookupQuery, opts?: { projects?: string[] }): Promise<LookupResult> => {
+      const v = this.v();
+      const res = lookup(v, q);
+      for (const p of opts?.projects ?? []) {
+        if (p === v.root) continue;
+        const other = await this.otherVault(p);
+        if (!other) continue;
+        // Other projects stay separate: only their Library is read, nothing is linked.
+        const r = lookup(other, { ...q, scope: { library: true } }, other.settings.name);
+        res.hits.push(...r.hits);
+        res.total += r.total;
+        if (r.canon && res.canon) {
+          for (const w of r.canon.works) if (!res.canon.works.some((x) => x.id === w.id)) res.canon.works.push(w);
+          res.canon.columns.push(...r.canon.columns);
+          for (const [w, row] of Object.entries(r.canon.cells)) res.canon.cells[w] = { ...(res.canon.cells[w] ?? {}), ...row };
+        }
+      }
+      return res;
+    },
+    quoteFor: async (blockId: string) => quoteFor(this.v(), blockId),
+    listLookups: async () => this.v().listLookups(),
+    saveLookup: async (l: SavedLookup) => this.v().saveLookup(l),
+    deleteLookup: async (name: string) => this.v().deleteLookup(name),
     graph: async () => buildGraph(this.v()),
     timeline: async () => buildTimeline(this.v()),
     getEntityNotes: async (id: string) => {
@@ -218,6 +245,19 @@ export class Backend {
     quickSwitch: async (q: string) => quickSwitch(this.v(), q),
     search: async (q: string, filters?: SearchFilters) => searchBlocks(this.v(), q, filters),
   };
+
+  private async otherVault(p: string): Promise<Vault | null> {
+    const cur = this.others.get(p);
+    if (cur && Date.now() - cur.at < 120_000) return cur.vault;
+    if (!Vault.isVault(p)) return null;
+    try {
+      const vault = await Vault.open(p, { author: this.config.author });
+      this.others.set(p, { vault, at: Date.now() });
+      return vault;
+    } catch {
+      return null;
+    }
+  }
 
   async call(method: string, args: unknown[]): Promise<unknown> {
     const fn = (this.methods as Record<string, (...a: unknown[]) => Promise<unknown>>)[method];

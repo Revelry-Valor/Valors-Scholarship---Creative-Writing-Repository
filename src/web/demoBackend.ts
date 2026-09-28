@@ -176,6 +176,81 @@ async function seedWorld() {
   return start.id;
 }
 
+// A few short public-domain passages (NPNF translations, KJV) so the Library,
+// the active scan and the Canon of Scripture lookup have something to read.
+const SAMPLE_LIBRARY: Array<{ title: string; author?: string; translation?: string; kind: 'text' | 'bible'; text: string }> = [
+  {
+    title: 'Church History, Book III',
+    author: 'Eusebius',
+    kind: 'text',
+    text: `Chapter XXV. The Divine Scriptures that are accepted and those that are not.
+
+Since we are dealing with this subject it is proper to sum up the writings of the New Testament which have been already mentioned. First then must be put the holy quaternion of the Gospels; following them the Acts of the Apostles.
+
+After this must be reckoned the epistles of Paul; next in order the extant former epistle of John, and likewise the epistle of Peter, must be maintained. After them is to be placed, if it really seem proper, the Apocalypse of John. These then belong among the accepted writings.
+
+Among the disputed writings, which are nevertheless recognized by many, are extant the so-called epistle of James and that of Jude, also the second epistle of Peter, and those that are called the second and third of John.
+
+Among the rejected writings must be reckoned also the Acts of Paul, and the so-called Shepherd, and the Apocalypse of Peter, and in addition to these the extant epistle of Barnabas, and the so-called Teachings of the Apostles.`,
+  },
+  {
+    title: 'Festal Letter 39',
+    author: 'Athanasius',
+    kind: 'text',
+    text: `Again it is not tedious to speak of the books of the New Testament. These are, the four Gospels, according to Matthew, Mark, Luke, and John. Afterwards, the Acts of the Apostles and Epistles called Catholic, seven, namely of James, one; of Peter, two; of John, three; after these, one of Jude.
+
+In addition, there are fourteen Epistles of Paul. And besides, the Revelation of John. These are fountains of salvation; in these alone is proclaimed the doctrine of godliness. Let no man add to these, neither let him take ought from these.
+
+But for greater exactness I add this also, writing of necessity; that there are other books besides these not indeed included in the Canon, but appointed by the Fathers to be read by those who newly join us: the Wisdom of Solomon, and the Wisdom of Sirach, and Esther, and Judith, and Tobit, and that which is called the Teaching of the Apostles, and the Shepherd.`,
+  },
+  {
+    title: 'Against Heresies, Book III',
+    author: 'Irenaeus',
+    kind: 'text',
+    text: `It is not possible that the Gospels can be either more or fewer in number than they are. For, since there are four zones of the world in which we live, and four principal winds, it is fitting that the Church should have four pillars. The Gospel is quadriform.
+
+For the Lord, in His Epistle to the Romans, as Paul says in Rom 3:23, teaches that all have sinned and come short of the glory of God.`,
+  },
+  {
+    title: 'Muratorian Fragment',
+    kind: 'text',
+    text: `The third book of the Gospel is that according to Luke. The fourth of the Gospels is that of John, one of the disciples.
+
+The epistle of Jude and two of the above-mentioned John are counted in the catholic Church. We receive only the apocalypses of John and Peter, though some of us are not willing that the latter be read in church.
+
+But Hermas wrote the Shepherd very recently, in our times; and therefore it ought indeed to be read, but it cannot be read publicly to the people in church.`,
+  },
+  {
+    title: 'King James Version (sample)',
+    translation: 'KJV',
+    kind: 'bible',
+    text: `John 1:1 In the beginning was the Word, and the Word was with God, and the Word was God.
+John 1:2 The same was in the beginning with God.
+John 1:3 All things were made by him; and without him was not any thing made that was made.
+John 1:14 And the Word was made flesh, and dwelt among us.
+Romans 3:23 For all have sinned, and come short of the glory of God;
+Romans 3:24 Being justified freely by his grace through the redemption that is in Christ Jesus:
+Romans 3:28 Therefore we conclude that a man is justified by faith without the deeds of the law.
+Acts 2:38 Then Peter said unto them, Repent, and be baptized every one of you in the name of Jesus Christ for the remission of sins.`,
+  },
+];
+
+async function addScholarshipLibrary() {
+  // Once only, so removing the samples keeps them removed.
+  try {
+    if (localStorage.getItem('lr.demo.library.v1')) return;
+  } catch {
+    // ignore
+  }
+  const v = await Vault.open(VAULT, { author: 'you' });
+  if (!v.listLibrary().length) for (const it of SAMPLE_LIBRARY) await v.importLibrary({ ...it, makePage: it.kind === 'text' && !!it.author });
+  try {
+    localStorage.setItem('lr.demo.library.v1', '1');
+  } catch {
+    // ignore
+  }
+}
+
 async function addScholarshipViews() {
   const v = await Vault.open(VAULT, { author: 'you' });
   if ((await v.listViews()).length) return;
@@ -206,6 +281,7 @@ const ready = (async () => {
   if (!hasDemoData() || !Vault.isVault(VAULT)) {
     const startId = await seed();
     await addScholarshipViews().catch(() => undefined);
+    await addScholarshipLibrary().catch(() => undefined);
     await backend.methods.openVault(WORLD).catch(() => undefined);
     await backend.methods.setAuthor('you');
     await backend.methods.openVault(VAULT);
@@ -216,6 +292,7 @@ const ready = (async () => {
     }
   } else {
     await addScholarshipViews().catch(() => undefined);
+    await addScholarshipLibrary().catch(() => undefined);
     await backend.restoreLastVault();
     // Sample projects made by an earlier version get the newer starter facts.
     if (backend.vault) await backend.methods.upgradeTemplates().catch(() => undefined);

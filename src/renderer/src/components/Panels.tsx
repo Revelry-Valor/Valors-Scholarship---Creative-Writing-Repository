@@ -78,6 +78,7 @@ function QuickReference() {
           ['Ctrl+Shift+E', 'New entity'],
           ['Ctrl+Shift+F', 'Search all writing'],
           ['Ctrl+Shift+A', 'Suggestions for this document'],
+          ['Ctrl+Shift+L', 'Research beside the page'],
           ['Ctrl+Enter', 'Open the chip under the cursor'],
           ['Ctrl+click', 'Open a chip'],
           ['Ctrl+E', 'Show raw markup'],

@@ -102,7 +102,7 @@ function flush() {
 }
 function persist() {
   clearTimeout(timer);
-  timer = setTimeout(flush, 300);
+  timer = setTimeout(flush, 60);
 }
 function touch(p: string) {
   dirty.add(p);
@@ -114,6 +114,8 @@ function drop(p: string) {
 }
 try {
   window.addEventListener('pagehide', flush);
+  window.addEventListener('beforeunload', flush);
+  document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && flush());
 } catch {
   // not in a browser
 }

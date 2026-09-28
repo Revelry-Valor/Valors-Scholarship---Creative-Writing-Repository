@@ -40,6 +40,21 @@ const markdownStyle = HighlightStyle.define([
   { tag: t.quote, fontStyle: 'italic' },
 ]);
 
+// The document editor you last typed in: the Research pane inserts quotations there.
+let lastDocView: EditorView | null = null;
+
+/** Insert a paragraph after the one at the cursor in the last-used document. */
+export function insertParagraph(text: string): boolean {
+  const view = lastDocView;
+  if (!view || !view.dom.isConnected) return false;
+  const line = view.state.doc.lineAt(view.state.selection.main.head);
+  const at = line.text.trim() ? line.to : line.from;
+  const insert = line.text.trim() ? `\n\n${text}` : text;
+  view.dispatch({ changes: { from: at, to: line.text.trim() ? at : line.to, insert }, selection: { anchor: at + insert.length }, scrollIntoView: true, userEvent: 'input.paste' });
+  view.focus();
+  return true;
+}
+
 export interface EditorHandle {
   view: EditorView;
   flush(): Promise<void>;
@@ -262,7 +277,13 @@ export function Editor(props: EditorProps) {
       view.dispatch({ selection: { anchor: view.state.doc.length } });
     }
     props.onReady?.({ view, flush: save });
+    const remember = () => {
+      if (!isBlock) lastDocView = view;
+    };
+    remember();
+    view.contentDOM.addEventListener('focus', remember);
     return () => {
+      if (lastDocView === view) lastDocView = null;
       clearTimeout(timer.current);
       if (!isBlock && view.state.doc.toString() !== lastSaved.current) void propsRef.current.onSave(`${view.state.doc.toString()}\n`);
       view.destroy();
