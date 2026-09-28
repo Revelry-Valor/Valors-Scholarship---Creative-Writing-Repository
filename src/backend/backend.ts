@@ -227,6 +227,7 @@ export class Backend {
     deleteLookup: async (name: string) => this.v().deleteLookup(name),
     entityTable: async (def: Pick<ViewDef, 'types' | 'fields'>) => entityTable(this.v(), def),
     parallel: async (def: Pick<ViewDef, 'columns' | 'align'>) => parallelView(this.v(), def),
+    contradictions: async () => this.v().contradictions(),
     listClaims: async () => this.v().listClaims(),
     addEvidence: async (claimId: string, blockId: string, stance: EvidenceStance, note?: string) => this.v().addEvidence(claimId, blockId, stance, note),
     removeEvidence: async (claimId: string, blockId: string) => this.v().removeEvidence(claimId, blockId),

@@ -18,6 +18,7 @@ import { LibraryReader, importToLibrary } from './Library';
 import { ReviewPage, SuggestBadge, TriggerWordsPage, openReview } from './Review';
 import { ResearchPane, ResearchSplitter } from './Research';
 import { ClaimsPage } from './Claims';
+import { ContradictionsPage } from './Contradictions';
 import { SpellingSettings } from './SpellingSettings';
 import { setSpellingPrefs } from '../editor/spelling';
 import { newView, addType } from './ViewsSidebar';
@@ -185,6 +186,7 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
         hint: 'Ctrl+Shift+L',
         run: () => app.setPanels({ research: true }),
       },
+      { id: 'conflicts', label: 'Find contradictions: facts, dates, links and statements that disagree', run: () => app.openTab({ kind: 'conflicts' }) },
       { id: 'claims', label: 'Claims & evidence: weigh what supports or opposes each claim', run: () => app.openTab({ kind: 'claims' }) },
       {
         id: 'triggers',
@@ -325,6 +327,7 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
     if (t.kind === 'review') return `✦ Review · ${t.label}`;
     if (t.kind === 'triggers') return '✦ Trigger words';
     if (t.kind === 'claims') return '⚖ Claims';
+    if (t.kind === 'conflicts') return '⚡ Contradictions';
     if (t.kind === 'library') return <LibraryTitle id={t.id} />;
     if (t.kind === 'view') return <ViewTitle id={t.id} />;
     return null;
@@ -443,6 +446,7 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
             {activeTab?.kind === 'review' && <ReviewPage key={JSON.stringify(activeTab.scope)} scope={activeTab.scope} label={activeTab.label} />}
             {activeTab?.kind === 'triggers' && <TriggerWordsPage />}
             {activeTab?.kind === 'claims' && <ClaimsPage />}
+            {activeTab?.kind === 'conflicts' && <ContradictionsPage />}
             {activeTab?.kind === 'library' && <LibraryReader key={activeTab.key} id={activeTab.id} focusBlock={activeTab.focusBlock} />}
             {!activeTab && <Welcome onNewEntry={newEntry} onNewEntity={() => newEntity()} onGoto={() => setPalette('switch')} />}
           </div>

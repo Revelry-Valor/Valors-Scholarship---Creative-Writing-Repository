@@ -226,7 +226,16 @@ export function TablePage({ def, setDef, update }: { def: ViewDef; setDef: (d: V
   };
   const download = () => {
     if (!data) return;
-    const blob = new Blob([tableCsv({ ...data, rows })], { type: 'text/csv' });
+    const csv = tableCsv({ ...data, rows });
+    // The browser demo cannot save files: copy instead.
+    if (window.__lrBackend) {
+      void navigator.clipboard
+        ?.writeText(csv)
+        .then(() => app.notify('Copied as CSV. Paste it into Excel or Google Sheets.'))
+        .catch(() => app.notify('Could not copy', 'error'));
+      return;
+    }
+    const blob = new Blob([csv], { type: 'text/csv' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `${def.name}.csv`;

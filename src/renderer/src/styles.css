@@ -3626,9 +3626,10 @@ mark.hit {
 .fb-claim.on {
   color: var(--claim);
 }
-.kd-claims-link {
-  float: right;
-  margin-top: -34px;
+.kd-links {
+  display: flex;
+  gap: 16px;
+  margin: -2px 0 8px;
 }
 .claims-page {
   max-width: 1000px;
@@ -3912,4 +3913,34 @@ mark.hit {
   padding: 6px 16px;
   border-top: 1px solid var(--line);
   margin: 0;
+}
+.con-title {
+  font: 600 18px/1.4 var(--serif);
+  margin: 2px 0 2px;
+}
+.con-detail {
+  margin: 0 0 10px;
+}
+.con-side {
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: var(--surface);
+}
+.con-side-label {
+  font: 600 11px var(--sans);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.con-text {
+  font: 15px/1.55 var(--serif);
+  margin: 0 0 4px;
+}
+.con-card {
+  border-left-color: var(--warn);
+}
+.con-card.con-dates {
+  border-left-color: var(--danger);
 }

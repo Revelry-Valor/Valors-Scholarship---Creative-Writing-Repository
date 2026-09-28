@@ -184,7 +184,7 @@ interface Cue {
 const CUES: Cue[] = [
   { re: /\b(some (of us )?(are )?not willing|not (received|accepted|acknowledged|admitted) by all|(received|recognized|recognised|accepted|acknowledged) by (some|many)|some (reject|doubt|question|do not (receive|accept|admit))|doubted|doubtful|disputed|contested|questioned|antilegomena|not universally|by some it is|still in dispute|in doubt)\b/gi, stance: 'disputed' },
   { re: /\b(to be read|for reading|read (by|for) (instruction|edification|those)|useful (to|for) read\w*|ecclesiastical books|appointed by the fathers)\b/gi, stance: 'read' },
-  { re: /\b(spurious|rejected?|rejects|not (indeed )?(received|accepted|admitted|reckoned|counted|numbered|canonical|scripture|included in the canon)|besides these|uncanonical|non-canonical|apocryph\w*|heretic\w*|forg(ed|ery)|falsely ascribed|fictitious|notha|excluded|outside the canon|cast out|not to be read)\b/gi, stance: 'rejected' },
+  { re: /\b(spurious|reject(?:s|ed)?|not (indeed )?(received|accepted|admitted|reckoned|counted|numbered|canonical|scripture|included in the canon)|besides these|uncanonical|non-canonical|apocryph\w*|heretic\w*|forg(ed|ery)|falsely ascribed|fictitious|notha|excluded|outside the canon|cast out|not to be read)\b/gi, stance: 'rejected' },
   { re: /\b(we receive|are counted|counted in|books of the (new|old) testament|fountains of salvation|let no (man|one) add|in these alone|doctrine of godliness|received|accepted|acknowledged|canonical|in the canon|homologoumena|divine scriptures?|holy scriptures?|sacred scriptures?|inspired|scriptures?|read (publicly )?in the churches|recognized|recognised|undisputed|genuine|authentic|the word of god|numbered among)\b/gi, stance: 'accepted' },
 ];
 

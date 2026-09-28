@@ -38,6 +38,7 @@ import { NameTable } from './names';
 import { importText, type ImportOptions } from './importer';
 import { compileThemes, defaultThemes, type TriggerTheme } from './triggers';
 import { claimViews, type ClaimLedger, type EvidenceStance } from './compare';
+import { findContradictions } from './contradictions';
 import { DEFAULT_DETECTORS, scanBlock, scanNewNames, type ScanBlock, type ScanContext, type Suggestion, type SuggestionKind } from './scan';
 import { colorFor, fallbackTemplate, resolveTemplates, STARTER_PACKS, WORLD_TEMPLATES, type StarterPack } from './templates';
 import type {
@@ -1294,6 +1295,11 @@ export class Vault {
       await this.toTrash(`views/${id}.yaml`);
       this.emit({ files: [`views/${id}.yaml`], entities: false, binder: true });
     });
+  }
+
+  /** Things that cannot all be true (see contradictions.ts); dismissed ones stay hidden. */
+  contradictions() {
+    return findContradictions(this, this.suggestionState.dismissed);
   }
 
   // ---------------------------------------------------------------- claims & evidence (claims.yaml)
