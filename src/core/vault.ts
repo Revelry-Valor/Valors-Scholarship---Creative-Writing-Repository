@@ -1303,13 +1303,20 @@ export class Vault {
 
   private lexicons = new Map<string, LexiconIndex>();
 
+  /** Header of each lexicon file, read once per file (the files can be many megabytes). */
+  private lexiconMetas = new Map<string, LexiconMeta | null>();
+
   async listLexicons(): Promise<LexiconMeta[]> {
     const out: LexiconMeta[] = [];
-    for (const f of await fs.readdir(this.abs('lexicons')).catch(() => [] as string[])) {
-      if (!f.endsWith('.tsv')) continue;
-      const text = await fs.readFile(this.abs(`lexicons/${f}`), 'utf8').catch(() => '');
-      const meta = readTsvMeta(text.slice(0, text.indexOf('\n')));
-      if (meta) out.push({ id: f.replace(/\.tsv$/, ''), file: `lexicons/${f}`, ...meta });
+    const files = ((await fs.readdir(this.abs('lexicons')).catch(() => [])) as string[]).filter((f) => f.endsWith('.tsv'));
+    for (const f of files) {
+      if (!this.lexiconMetas.has(f)) {
+        const text = await fs.readFile(this.abs(`lexicons/${f}`), 'utf8').catch(() => '');
+        const meta = readTsvMeta(text.slice(0, text.indexOf('\n')));
+        this.lexiconMetas.set(f, meta ? { id: f.replace(/\.tsv$/, ''), file: `lexicons/${f}`, ...meta } : null);
+      }
+      const m = this.lexiconMetas.get(f);
+      if (m) out.push(m);
     }
     return out.sort((a, b) => a.name.localeCompare(b.name));
   }
@@ -1340,6 +1347,7 @@ export class Vault {
       const language = languageOf(entries);
       await this.writeRel(`lexicons/${id}.tsv`, toTsv({ name, language, count: entries.length }, entries));
       this.lexicons.delete(id);
+      this.lexiconMetas.delete(`${id}.tsv`);
       this.emit({ files: [`lexicons/${id}.tsv`], entities: false });
       return { id, name, language, count: entries.length, sample: entries.slice(0, 3) };
     });
@@ -1349,6 +1357,7 @@ export class Vault {
     return this.exclusive(async () => {
       await this.toTrash(`lexicons/${id}.tsv`);
       this.lexicons.delete(id);
+      this.lexiconMetas.delete(`${id}.tsv`);
       this.emit({ files: [`lexicons/${id}.tsv`], entities: false });
     });
   }
