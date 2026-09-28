@@ -64,6 +64,8 @@ export interface VaultSettings {
   lastUsedType?: string;
   autoLink?: boolean;
   stopList?: string[];
+  /** Active scan: suggest filing as you write and import. */
+  scan?: { active?: boolean; detectors?: Partial<Record<'mention' | 'ambiguous' | 'keyword' | 'theme' | 'scripture' | 'major' | 'new-name', boolean>> };
 }
 
 export type BlockKind = 'paragraph' | 'heading' | 'list' | 'quote' | 'code';

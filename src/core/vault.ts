@@ -6,6 +6,7 @@
 //   relations.yaml  relationship types with inverse labels
 //   settings.yaml   vault settings
 //   binder.yaml     manual ordering of the binder
+//   triggers.yaml   trigger-word themes for the active scan
 //   .meta/          block authorship and history (keep)
 //   .index/         generated, safe to delete
 //
@@ -33,6 +34,8 @@ import { countWords, formatTag, normalizeName, plainText, tokenize, type TagToke
 import { MetaStore } from './meta';
 import { NameTable } from './names';
 import { importText, type ImportOptions } from './importer';
+import { compileThemes, defaultThemes, type TriggerTheme } from './triggers';
+import { DEFAULT_DETECTORS, scanBlock, scanNewNames, type ScanBlock, type ScanContext, type Suggestion, type SuggestionKind } from './scan';
 import { colorFor, fallbackTemplate, resolveTemplates, STARTER_PACKS, WORLD_TEMPLATES, type StarterPack } from './templates';
 import type {
   DocKind,
@@ -52,6 +55,16 @@ import type {
   ViewDef,
   ViewKind,
 } from './types';
+
+/** What the active scan reads: one document, some imported sources, a Library collection, all writing, the Library, or everything. */
+export interface ScanScope {
+  doc?: { kind: DocKind; id: string };
+  ids?: string[];
+  collection?: string;
+  library?: boolean;
+  writing?: boolean;
+  all?: boolean;
+}
 
 export const VAULT_MARKER = 'settings.yaml';
 
@@ -103,6 +116,8 @@ export class Vault {
   names = new NameTable();
   meta: MetaStore;
   binderOrder: Record<string, string[]> = {};
+  themes: TriggerTheme[] = [];
+  private suggestionState = { dismissed: new Set<string>(), never: new Set<string>() };
   /** Content we last wrote per file, so the watcher can ignore our own writes. */
   private written = new Map<string, string>();
   private listeners = new Set<(e: ChangeEvent) => void>();
@@ -220,6 +235,18 @@ export class Vault {
       }
     }
     this.templates = resolveTemplates(this.templateDefs);
+    try {
+      const t = YAML.parse(await fs.readFile(this.abs('triggers.yaml'), 'utf8')) as { themes?: TriggerTheme[] };
+      this.themes = (t?.themes ?? []).filter((x) => x?.id && Array.isArray(x.words));
+    } catch {
+      this.themes = defaultThemes(this.settings.mode);
+    }
+    try {
+      const st = JSON.parse(await fs.readFile(this.abs('.meta/suggestions.json'), 'utf8')) as { dismissed?: string[]; never?: string[] };
+      this.suggestionState = { dismissed: new Set(st.dismissed ?? []), never: new Set(st.never ?? []) };
+    } catch {
+      this.suggestionState = { dismissed: new Set(), never: new Set() };
+    }
     try {
       const b = YAML.parse(await fs.readFile(this.abs('binder.yaml'), 'utf8'));
       this.binderOrder = b?.order ?? {};
@@ -547,6 +574,200 @@ export class Vault {
   topicType(): string {
     if (this.templates.has('topic')) return 'topic';
     return [...this.templates.keys()].find((k) => k.includes('topic')) ?? this.settings.defaultEntityType;
+  }
+
+  // ---------------------------------------------------------------- active scan (spec 7, 12.1)
+
+  scanSettings() {
+    return { active: this.settings.scan?.active ?? false, detectors: { ...DEFAULT_DETECTORS, ...(this.settings.scan?.detectors ?? {}) } };
+  }
+
+  setScanSettings(patch: { active?: boolean; detectors?: Partial<Record<SuggestionKind, boolean>> }) {
+    return this.exclusive(async () => {
+      const cur = this.scanSettings();
+      this.settings.scan = { active: patch.active ?? cur.active, detectors: { ...cur.detectors, ...(patch.detectors ?? {}) } };
+      await this.writeRel('settings.yaml', YAML.stringify(this.settings));
+      return this.scanSettings();
+    });
+  }
+
+  getTriggers(): TriggerTheme[] {
+    return this.themes;
+  }
+
+  saveTriggers(themes: TriggerTheme[]) {
+    return this.exclusive(async () => {
+      this.themes = themes
+        .filter((t) => t.label?.trim())
+        .map((t) => ({ ...t, id: t.id || t.label.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, ''), label: t.label.trim(), words: [...new Set(t.words.map((x) => x.trim().toLowerCase()).filter(Boolean))] }));
+      await this.writeRel('triggers.yaml', YAML.stringify({ themes: this.themes }));
+      return this.themes;
+    });
+  }
+
+  /** Put the built-in lists back (keeps themes you added yourself). */
+  resetTriggers() {
+    const builtIn = defaultThemes(this.settings.mode);
+    const mine = this.themes.filter((t) => !builtIn.some((b) => b.id === t.id));
+    return this.saveTriggers([...builtIn, ...mine]);
+  }
+
+  private scanContext(detectors?: Partial<Record<SuggestionKind, boolean>>): ScanContext {
+    const entities = new Map([...this.entities.values()].map((e) => [e.id, { id: e.id, name: e.name, keywords: e.keywords ?? [] }]));
+    return {
+      names: this.names,
+      entities,
+      themes: compileThemes(this.themes),
+      detectors: { ...this.scanSettings().detectors, ...(detectors ?? {}) },
+      stop: new Set((this.settings.stopList ?? []).map((x) => normalizeName(x))),
+      findPage: (name) => {
+        // Exact name or alias only: "John" (the Gospel) must not find John Chrysostom.
+        const r = this.names.resolve(name);
+        if (r.status !== 'ok') return undefined;
+        const e = this.entities.get(r.id)!;
+        const k = normalizeName(name);
+        return [e.name, ...e.aliases].some((n) => normalizeName(n) === k) ? r.id : undefined;
+      },
+    };
+  }
+
+  private scanBlocksOf(rel: string): ScanBlock[] {
+    const st = this.files.get(rel);
+    if (!st) return [];
+    const docKind = st.kind === 'library' ? this.library.get(st.ownerId)?.kind ?? 'text' : st.kind;
+    const out: ScanBlock[] = [];
+    for (const pb of st.blocks) {
+      const b = pb.id ? this.blocks.get(pb.id) : undefined;
+      if (!b) continue;
+      out.push({ id: b.id, text: b.text, owner: b.owner, docKind, filedTo: b.filedTo.map((f) => f.entityId), marks: b.marks, scripture: b.scripture, heading: b.kind === 'heading' });
+    }
+    return out;
+  }
+
+  private docKey(rel: string): string {
+    const st = this.files.get(rel);
+    return st ? `${st.kind}:${st.ownerId}` : rel;
+  }
+
+  private suggestionOpen(s: Suggestion, rel: string): boolean {
+    if (this.suggestionState.dismissed.has(s.id)) return false;
+    const [, kind, target] = s.id.split('|');
+    return !this.suggestionState.never.has(`${this.docKey(rel)}|${kind}|${target}`) && !this.suggestionState.never.has(`*|${kind}|${target}`);
+  }
+
+  /**
+   * Run the scan over part of the project. Nothing is changed; each result waits to be
+   * accepted or dismissed. Scopes: one document, a Library collection, all your writing,
+   * the whole Library, or everything.
+   */
+  scan(scope: ScanScope, opts: { kinds?: SuggestionKind[]; limit?: number } = {}) {
+    const files: string[] = [];
+    for (const [rel, st] of this.files) {
+      if (scope.all) files.push(rel);
+      else if (scope.doc && st.kind === scope.doc.kind && st.ownerId === scope.doc.id) files.push(rel);
+      else if (scope.ids && st.kind === 'library' && scope.ids.includes(st.ownerId)) files.push(rel);
+      else if (scope.collection !== undefined && st.kind === 'library' && this.library.get(st.ownerId)?.collection === scope.collection) files.push(rel);
+      else if (scope.library && st.kind === 'library') files.push(rel);
+      else if (scope.writing && st.kind !== 'library') files.push(rel);
+    }
+    files.sort();
+    const detectors = opts.kinds ? Object.fromEntries(Object.keys(DEFAULT_DETECTORS).map((k) => [k, opts.kinds!.includes(k as SuggestionKind)])) : undefined;
+    const ctx = this.scanContext(detectors);
+    const limit = opts.limit ?? 1500;
+    const out: Array<Suggestion & { text: string; source: { kind: DocKind; id: string; title: string } }> = [];
+    let total = 0;
+    for (const rel of files) {
+      const blocks = this.scanBlocksOf(rel);
+      const lib = this.files.get(rel)!.kind === 'library';
+      const found = [...blocks.flatMap((b) => scanBlock(b, ctx)), ...scanNewNames(blocks, ctx, lib ? 3 : 2)].filter((s) => this.suggestionOpen(s, rel));
+      total += found.length;
+      for (const s of found) {
+        if (out.length >= limit) break;
+        const b = this.blocks.get(s.blockId)!;
+        out.push({ ...s, text: b.text, source: { kind: b.owner.kind, id: b.owner.id, title: this.sourceTitle(b) } });
+      }
+    }
+    const order = new Map(files.map((f, i) => [f, i]));
+    out.sort((a, b) => {
+      const ba = this.blocks.get(a.blockId)!;
+      const bb = this.blocks.get(b.blockId)!;
+      return (order.get(ba.file)! - order.get(bb.file)!) || ba.position - bb.position || b.score - a.score;
+    });
+    return { suggestions: out, total, truncated: total > out.length };
+  }
+
+  private findSuggestion(id: string): Suggestion | undefined {
+    const [blockId, kind] = id.split('|');
+    const b = this.blocks.get(blockId);
+    if (!b) return undefined;
+    const ctx = this.scanContext({ ...DEFAULT_DETECTORS });
+    const blocks = this.scanBlocksOf(b.file);
+    const list = kind === 'new-name' ? scanNewNames(blocks, ctx, 1) : scanBlock(blocks.find((x) => x.id === blockId)!, ctx);
+    return list.find((s) => s.id === id);
+  }
+
+  /**
+   * Accept a suggestion. Names and keywords in your own writing become chips where they
+   * stand; imported (read-only) paragraphs get the tag added at the end; major statements
+   * are marked ★. Missing pages (a theme's page, a new name) are created first.
+   */
+  acceptSuggestion(id: string, choice: { entityId?: string; type?: string; section?: string } = {}) {
+    return this.exclusive(async () => {
+      const s = this.findSuggestion(id);
+      if (!s) throw new Error('This suggestion no longer applies (the paragraph has changed).');
+      const b = this.getBlock(s.blockId);
+      let text = b.text;
+      let createdPage: EntityRecord | undefined;
+      if (s.kind === 'major') {
+        text = `${text.trimEnd()} !key`;
+      } else {
+        let entityId = choice.entityId ?? (s.kind === 'ambiguous' ? undefined : s.entityIds[0]);
+        if (!entityId && s.create) {
+          const type = choice.type && this.templates.has(choice.type) ? choice.type : s.kind === 'theme' ? this.topicType() : this.settings.lastUsedType ?? this.settings.defaultEntityType;
+          const existing = this.names.resolve(s.create);
+          if (existing.status === 'ok') entityId = existing.id;
+          else {
+            createdPage = await this.writeNewEntity(s.create, type);
+            entityId = createdPage.id;
+            this.rebuildNames();
+          }
+        }
+        if (!entityId) throw new Error('Choose which page this is.');
+        const e = this.entities.get(entityId);
+        if (!e) throw new Error('No such page');
+        const section = choice.section ? `::${/\s/.test(choice.section) ? `[${choice.section}]` : choice.section}` : '';
+        const span = text.slice(s.from, s.to);
+        const wrap = b.owner.kind !== 'library' && s.kind !== 'scripture' && s.to > s.from && !/[\[\]|]/.test(span);
+        if (wrap) {
+          const r = this.names.resolve(span);
+          const same = r.status === 'ok' && r.id === e.id;
+          const tag = same ? formatTag(span) : `@[${e.name}|${span}]`;
+          text = text.slice(0, s.from) + tag + section + text.slice(s.to);
+        } else if (!b.filedTo.some((f) => f.entityId === e.id)) {
+          text = `${text.trimEnd()} ${formatTag(e.name)}${section}`;
+        }
+      }
+      const st = this.files.get(b.file)!;
+      const res = await this.saveBody(b.file, replaceBlockInBody(st.body, b.id, text)!);
+      if (createdPage) {
+        this.analyzeAll();
+        this.emit({ files: [createdPage.file], entities: true });
+      }
+      return { ...res, createdPage: createdPage ? this.chip(createdPage) : undefined };
+    });
+  }
+
+  /** Dismiss once, never in this document, or never anywhere. Remembered in .meta/suggestions.json. */
+  dismissSuggestion(id: string, mode: 'once' | 'here' | 'everywhere' = 'once') {
+    return this.exclusive(async () => {
+      const [blockId, kind, target] = id.split('|');
+      const b = this.blocks.get(blockId);
+      if (mode === 'once' || !b) this.suggestionState.dismissed.add(id);
+      else this.suggestionState.never.add(`${mode === 'here' ? this.docKey(b.file) : '*'}|${kind}|${target}`);
+      await fs.mkdir(this.abs('.meta'), { recursive: true });
+      await fs.writeFile(this.abs('.meta/suggestions.json'), JSON.stringify({ dismissed: [...this.suggestionState.dismissed], never: [...this.suggestionState.never] }, null, 1));
+      return true;
+    });
   }
 
   // ---------------------------------------------------------------- info

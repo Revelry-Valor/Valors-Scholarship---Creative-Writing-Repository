@@ -5,6 +5,7 @@ import { api, type ApiResult } from '../api';
 import { useApp } from '../state';
 import { useDialogs } from './Dialogs';
 import { BlockText } from './BlockText';
+import { afterImport, openReview } from './Review';
 
 type Lib = ApiResult<'listLibrary'>;
 type Doc = ApiResult<'getLibraryDoc'>;
@@ -35,6 +36,10 @@ function ImportDialog({ initialFiles, onDone }: { initialFiles?: File[]; onDone:
   const [author, setAuthor] = useState('');
   const [translation, setTranslation] = useState('');
   const [makePage, setMakePage] = useState(true);
+  const [scan, setScan] = useState(false);
+  useEffect(() => {
+    api.scanSettings().then((st) => setScan(st.active)).catch(() => undefined);
+  }, []);
   const [progress, setProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -48,6 +53,7 @@ function ImportDialog({ initialFiles, onDone }: { initialFiles?: File[]; onDone:
       return;
     }
     const done: string[] = [];
+    const ids: string[] = [];
     try {
       for (let i = 0; i < jobs.length; i++) {
         const f = jobs[i];
@@ -64,10 +70,15 @@ function ImportDialog({ initialFiles, onDone }: { initialFiles?: File[]; onDone:
           translation: translation.trim() || undefined,
           makePage,
         });
+        ids.push(...r.ids);
         done.push(r.kind === 'bible' ? `${t}: ${r.paragraphs.toLocaleString()} verses in ${r.ids.length} books` : `${t}: ${r.paragraphs.toLocaleString()} paragraphs`);
       }
       app.notify(`Imported ${done.join('; ')}`);
       onDone();
+      if (scan) {
+        const label = jobs.length === 1 ? (title.trim() || (files[0] ? titleFromFile(files[0].name) : 'Pasted text')) : `${jobs.length} imports`;
+        void afterImport(app, ids, label, true);
+      }
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -162,6 +173,13 @@ function ImportDialog({ initialFiles, onDone }: { initialFiles?: File[]; onDone:
           </span>
         </label>
       )}
+      <label className="check-row">
+        <input type="checkbox" checked={scan} onChange={(e) => setScan(e.target.checked)} />
+        <span>
+          Scan it and ask me what to file
+          <small>Looks for your people, places and topics, trigger words (canon, prophecy, baptism…) and major statements, then opens a review list. Nothing is filed until you accept.</small>
+        </span>
+      </label>
       {progress && <p className="import-progress">{progress}</p>}
       {error && <p className="error">{error}</p>}
       <div className="modal-actions">
@@ -327,6 +345,9 @@ export function LibraryReader({ id, focusBlock }: { id: string; focusBlock?: str
         )}
         <span className="spacer" />
         <span className="muted small">Read-only · hover a paragraph to file it to a page or mark it</span>
+        <button className="fb-btn fb-link" title="Scan this text for things to file" onClick={() => openReview(app, doc.collection ? { collection: doc.collection } : { ids: [doc.id] }, doc.collection ? `Library: ${doc.collection}` : doc.title)}>
+          ✦ Scan
+        </button>
         {doc.page && (
           <button className="fb-btn fb-link" onClick={() => app.openTab({ kind: 'entity', id: doc.page! })}>
             Open its page

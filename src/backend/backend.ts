@@ -12,6 +12,7 @@ import { STARTER_PACKS } from '../core/templates';
 import { DEFAULT_AUTOCORRECT, NAME_STOPWORDS, type AutocorrectPrefs } from '../core/autocorrect';
 import type { EntryStatus, TemplateDef, ViewDef } from '../core/types';
 import { buildGraph, buildTimeline } from '../core/graph';
+import type { TriggerTheme } from '../core/triggers';
 
 export interface RecentVault {
   path: string;
@@ -188,6 +189,14 @@ export class Backend {
     getLibraryDoc: async (id: string) => this.v().getLibraryDoc(id),
     deleteLibrary: async (target: { id?: string; collection?: string }) => this.v().deleteLibrary(target),
     annotateLibraryBlock: async (blockId: string, action: { entityId?: string; section?: string; mark?: 'key' | 'check' }) => this.v().annotateLibraryBlock(blockId, action),
+    scan: async (scope: Parameters<Vault['scan']>[0], opts?: Parameters<Vault['scan']>[1]) => this.v().scan(scope, opts),
+    acceptSuggestion: async (id: string, choice?: { entityId?: string; type?: string; section?: string }) => this.v().acceptSuggestion(id, choice),
+    dismissSuggestion: async (id: string, mode?: 'once' | 'here' | 'everywhere') => this.v().dismissSuggestion(id, mode),
+    scanSettings: async () => this.v().scanSettings(),
+    setScanSettings: async (patch: Parameters<Vault['setScanSettings']>[0]) => this.v().setScanSettings(patch),
+    getTriggers: async () => this.v().getTriggers(),
+    saveTriggers: async (themes: TriggerTheme[]) => this.v().saveTriggers(themes),
+    resetTriggers: async () => this.v().resetTriggers(),
     graph: async () => buildGraph(this.v()),
     timeline: async () => buildTimeline(this.v()),
     getEntityNotes: async (id: string) => {

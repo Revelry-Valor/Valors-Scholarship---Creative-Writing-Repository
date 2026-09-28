@@ -4,16 +4,20 @@ import { useApp } from '../state';
 import { QUICK_REFERENCE } from '../../../core/editing';
 import { api } from '../api';
 import { useDialogs } from './Dialogs';
+import { SuggestionsPanel } from './Review';
 
 export function RightPanel() {
   const app = useApp();
   const which = app.panels.right;
   if (!which) return null;
   return (
-    <aside className="right-panel" aria-label={which === 'reference' ? 'Quick reference' : 'This block'}>
+    <aside className="right-panel" aria-label={which === 'reference' ? 'Quick reference' : which === 'suggest' ? 'Suggestions' : 'This block'}>
       <div className="panel-tabs" role="tablist">
         <button role="tab" aria-selected={which === 'context'} className={which === 'context' ? 'active' : ''} onClick={() => app.setPanels({ right: 'context' })}>
-          This block
+          Block
+        </button>
+        <button role="tab" aria-selected={which === 'suggest'} className={which === 'suggest' ? 'active' : ''} onClick={() => app.setPanels({ right: 'suggest' })} title="What the active scan found in this document">
+          ✦ Suggest
         </button>
         <button role="tab" aria-selected={which === 'reference'} className={which === 'reference' ? 'active' : ''} onClick={() => app.setPanels({ right: 'reference' })}>
           Markup <kbd>F1</kbd>
@@ -32,7 +36,7 @@ export function RightPanel() {
           ×
         </button>
       </div>
-      {which === 'reference' ? <QuickReference /> : <BlockContext />}
+      {which === 'reference' ? <QuickReference /> : which === 'suggest' ? <SuggestionsPanel /> : <BlockContext />}
     </aside>
   );
 }
@@ -73,6 +77,7 @@ function QuickReference() {
           ['Ctrl+N', 'New document'],
           ['Ctrl+Shift+E', 'New entity'],
           ['Ctrl+Shift+F', 'Search all writing'],
+          ['Ctrl+Shift+A', 'Suggestions for this document'],
           ['Ctrl+Enter', 'Open the chip under the cursor'],
           ['Ctrl+click', 'Open a chip'],
           ['Ctrl+E', 'Show raw markup'],

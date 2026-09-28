@@ -15,6 +15,7 @@ import { TemplateEditor } from './TemplateEditor';
 import { ViewPage } from '../charts/ViewPage';
 import { KeyDetailsPage } from './KeyDetails';
 import { LibraryReader, importToLibrary } from './Library';
+import { ReviewPage, SuggestBadge, TriggerWordsPage, openReview } from './Review';
 import { SpellingSettings } from './SpellingSettings';
 import { setSpellingPrefs } from '../editor/spelling';
 import { newView, addType } from './ViewsSidebar';
@@ -94,6 +95,9 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
       { id: 'close-tab', label: 'Close tab', hint: 'Ctrl+W', run: () => app.active && app.closeTab(app.active) },
       { id: 'theme', label: `Theme: ${theme} → ${theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system'}`, run: cycleTheme },
       { id: 'import', label: 'Import into the Library (Bibles, works, articles)…', run: () => importToLibrary(app, dialogs) },
+      { id: 'review', label: 'Review suggestions: names, trigger words and key statements to file', run: () => openReview(app, { writing: true }, 'All my writing') },
+      { id: 'suggest-panel', label: 'Suggestions for this document (right bar)', hint: 'Ctrl+Shift+A', run: () => app.setPanels({ right: 'suggest' }) },
+      { id: 'triggers', label: 'Edit trigger words (canon, prophecy, baptism…)', run: () => app.openTab({ kind: 'triggers' }) },
       { id: 'key-details', label: 'Key details: everything marked important or to check', run: () => app.openTab({ kind: 'marks' }) },
       { id: 'new-view', label: 'New timeline or tree (family, lineage, tech, radial, web)…', run: () => newView(app, dialogs) },
       { id: 'add-type', label: 'Add a type (Settlement, Race, Species, Flora, Fauna, Technology…)', run: () => addType(app, dialogs) },
@@ -171,6 +175,7 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
       else if (mod && !e.shiftKey && k === 'n') newEntry();
       else if (mod && e.shiftKey && k === 'e') newEntity();
       else if (mod && e.shiftKey && k === 'f') app.openTab({ kind: 'search', query: '' });
+      else if (mod && e.shiftKey && k === 'a') app.setPanels({ right: app.panels.right === 'suggest' ? null : 'suggest' });
       else if (mod && !e.shiftKey && k === 'e') app.setRawMarkup(!app.rawMarkup);
       else if (mod && e.key === '\\') app.setPanels({ right: app.panels.right ? null : 'context' });
       else if (mod && e.shiftKey && e.key === 'Enter') app.setFocusMode(!app.focusMode);
@@ -192,6 +197,8 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
     if (t.kind === 'entity') return app.entityById.get(t.id)?.name ?? '…';
     if (t.kind === 'search') return 'Search';
     if (t.kind === 'marks') return '★ Key details';
+    if (t.kind === 'review') return `✦ Review · ${t.label}`;
+    if (t.kind === 'triggers') return '✦ Trigger words';
     if (t.kind === 'library') return <LibraryTitle id={t.id} />;
     if (t.kind === 'view') return <ViewTitle id={t.id} />;
     return null;
@@ -237,10 +244,19 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
           <span className="spacer" />
           <div className="topbar-actions">
             <button className="top-btn" onClick={() => setPalette('switch')} title="Jump to any entry or entity (Ctrl+O)">
-              ⌕ Go to… <kbd>Ctrl+O</kbd>
+              ⌕ Go to…
             </button>
             <button className={`top-btn ${activeTab?.kind === 'marks' ? 'on' : ''}`} title="Everything you marked important or to check" onClick={() => app.openTab({ kind: 'marks' })}>
               ★ Key details
+            </button>
+            <button
+              className={`top-btn ${activeTab?.kind === 'review' || app.panels.right === 'suggest' ? 'on' : ''}`}
+              title="What the active scan found in this document (Ctrl+Shift+A). Double-click for the full review."
+              onClick={() => app.setPanels({ right: app.panels.right === 'suggest' ? null : 'suggest' })}
+              onDoubleClick={() => openReview(app, { writing: true }, 'All my writing')}
+            >
+              ✦ Suggest
+              <SuggestBadge />
             </button>
             <button
               className={`top-btn ${cmdMenu ? 'on' : ''}`}
@@ -270,6 +286,8 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
           {activeTab?.kind === 'search' && <SearchView query={activeTab.query} />}
           {activeTab?.kind === 'view' && <ViewPage key={activeTab.key} id={activeTab.id} />}
           {activeTab?.kind === 'marks' && <KeyDetailsPage />}
+          {activeTab?.kind === 'review' && <ReviewPage key={JSON.stringify(activeTab.scope)} scope={activeTab.scope} label={activeTab.label} />}
+          {activeTab?.kind === 'triggers' && <TriggerWordsPage />}
           {activeTab?.kind === 'library' && <LibraryReader key={activeTab.key} id={activeTab.id} focusBlock={activeTab.focusBlock} />}
           {!activeTab && <Welcome onNewEntry={newEntry} onNewEntity={() => newEntity()} onGoto={() => setPalette('switch')} />}
         </div>

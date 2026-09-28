@@ -5,6 +5,7 @@ import { NameTable } from '../../core/names';
 import type { AnalysisContext } from '../../core/analysis';
 import type { EntityChip, ResolvedTemplate, RelationTypeDef } from '../../core/types';
 import type { BackendEvent } from '../../backend/backend';
+import type { ScanScope } from '../../core/vault';
 
 export type Tab =
   | { key: string; kind: 'entry'; id: string; focusBlock?: string }
@@ -12,7 +13,9 @@ export type Tab =
   | { key: string; kind: 'search'; query: string }
   | { key: string; kind: 'view'; id: string }
   | { key: string; kind: 'library'; id: string; focusBlock?: string }
-  | { key: string; kind: 'marks' };
+  | { key: string; kind: 'marks' }
+  | { key: string; kind: 'review'; scope: ScanScope; label: string }
+  | { key: string; kind: 'triggers' };
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 export type TabInput = DistributiveOmit<Tab, 'key'>;
@@ -48,7 +51,7 @@ interface AppState {
   openTab: (t: TabInput, opts?: { newTab?: boolean }) => void;
   closeTab: (key: string) => void;
   setActive: (key: string) => void;
-  panels: { right: 'context' | 'reference' | null; pinnedReference: boolean };
+  panels: { right: 'context' | 'reference' | 'suggest' | null; pinnedReference: boolean };
   setPanels: (p: Partial<AppState['panels']>) => void;
   rawMarkup: boolean;
   setRawMarkup: (v: boolean) => void;
@@ -71,7 +74,7 @@ export function useApp(): AppState {
 }
 
 function tabKey(t: TabInput): string {
-  return t.kind === 'search' ? 'search' : t.kind === 'marks' ? 'marks' : `${t.kind}:${t.id}`;
+  return t.kind === 'search' || t.kind === 'marks' || t.kind === 'review' || t.kind === 'triggers' ? t.kind : `${t.kind}:${t.id}`;
 }
 
 function loadTabs(root: string): { tabs: Tab[]; active: string | null } {
