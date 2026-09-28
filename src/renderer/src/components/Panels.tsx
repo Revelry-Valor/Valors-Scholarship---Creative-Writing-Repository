@@ -5,6 +5,7 @@ import { QUICK_REFERENCE } from '../../../core/editing';
 import { api } from '../api';
 import { useDialogs } from './Dialogs';
 import { SuggestionsPanel } from './Review';
+import { LexiconPanel } from './LexiconPanel';
 
 export function RightPanel() {
   const app = useApp();
@@ -18,6 +19,9 @@ export function RightPanel() {
         </button>
         <button role="tab" aria-selected={which === 'suggest'} className={which === 'suggest' ? 'active' : ''} onClick={() => app.setPanels({ right: 'suggest' })} title="What the active scan found in this document">
           ✦ Suggest
+        </button>
+        <button role="tab" aria-selected={which === 'lexicon'} className={which === 'lexicon' ? 'active' : ''} onClick={() => app.setPanels({ right: 'lexicon' })} title="Greek, Hebrew and other lexicons">
+          Α Lexicon
         </button>
         <button role="tab" aria-selected={which === 'reference'} className={which === 'reference' ? 'active' : ''} onClick={() => app.setPanels({ right: 'reference' })}>
           Markup <kbd>F1</kbd>
@@ -36,7 +40,7 @@ export function RightPanel() {
           ×
         </button>
       </div>
-      {which === 'reference' ? <QuickReference /> : which === 'suggest' ? <SuggestionsPanel /> : <BlockContext />}
+      {which === 'reference' ? <QuickReference /> : which === 'suggest' ? <SuggestionsPanel /> : which === 'lexicon' ? <LexiconPanel /> : <BlockContext />}
     </aside>
   );
 }
@@ -79,6 +83,7 @@ function QuickReference() {
           ['Ctrl+Shift+F', 'Search all writing'],
           ['Ctrl+Shift+A', 'Suggestions for this document'],
           ['Ctrl+Shift+L', 'Research beside the page'],
+          ['Ctrl+Shift+G', 'Lexicon (Greek, Hebrew…)'],
           ['Ctrl+Enter', 'Open the chip under the cursor'],
           ['Ctrl+click', 'Open a chip'],
           ['Ctrl+E', 'Show raw markup'],

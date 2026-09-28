@@ -3944,3 +3944,112 @@ mark.hit {
 .con-card.con-dates {
   border-left-color: var(--danger);
 }
+
+/* ---------- lexicons */
+.lex-panel h3 {
+  margin: 16px 0 6px;
+}
+.lex-entry {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-top: 8px;
+  background: var(--paper);
+}
+.lex-entry-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.lex-lemma {
+  font: 600 19px/1.2 'Gentium Plus', 'SBL Greek', 'Noto Serif', var(--serif);
+}
+.lex-translit {
+  font-style: italic;
+  color: var(--ink-soft);
+}
+.lex-strong {
+  font: 600 11px var(--sans);
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line));
+  border-radius: 999px;
+  padding: 0 6px;
+}
+.lex-meta {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.lex-gloss {
+  font-weight: 600;
+  font-size: 14px;
+  margin-top: 2px;
+}
+.lex-def {
+  font: 13.5px/1.5 var(--serif);
+  color: var(--ink-soft);
+  margin-top: 3px;
+  cursor: pointer;
+}
+.lex-def.open {
+  cursor: auto;
+}
+.lex-src {
+  font-size: 10.5px;
+  color: var(--faint);
+  margin-top: 4px;
+}
+.lex-para {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.lex-para .linkish {
+  font: 600 16px 'Gentium Plus', 'Noto Serif', var(--serif);
+}
+.lex-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 8px;
+}
+.lex-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 13px;
+}
+.lex-list li span:first-child {
+  flex: 1;
+}
+.cm-tooltip.cm-tooltip-hover:has(.lex-tip) {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  box-shadow: var(--shadow);
+}
+.lex-tip {
+  max-width: 380px;
+  padding: 8px 10px;
+  color: var(--ink);
+}
+.lex-tip-row + .lex-tip-row {
+  border-top: 1px solid var(--line-soft);
+  margin-top: 6px;
+  padding-top: 6px;
+}
+.lex-tip-head {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+.lex-tip .lex-def {
+  cursor: auto;
+}
+.right-panel .panel-tabs > button[role='tab'] {
+  padding-left: 7px;
+  padding-right: 7px;
+}

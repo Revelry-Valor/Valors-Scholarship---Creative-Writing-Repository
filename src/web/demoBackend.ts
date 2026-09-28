@@ -235,6 +235,57 @@ Acts 2:38 Then Peter said unto them, Repent, and be baptized every one of you in
   },
 ];
 
+// A small Greek and Hebrew glossary (Strong's numbers are public domain; glosses are short and our own).
+const SAMPLE_LEXICON = `Strong\tLemma\tTranslit\tGloss\tDefinition
+G3056\tλόγος\tlogos\tword\tword, speech, account, reason; in John 1 the divine Word
+G26\tἀγάπη\tagapē\tlove\tlove, goodwill; the love of God and of neighbour
+G5485\tχάρις\tcharis\tgrace\tgrace, favour, kindness, gift freely given; thanks
+G4102\tπίστις\tpistis\tfaith\tfaith, trust, faithfulness; that which is believed
+G3341\tμετάνοια\tmetanoia\trepentance\ta change of mind, repentance, turning
+G907\tβαπτίζω\tbaptizō\tbaptize\tto dip, immerse, wash; to baptize
+G1577\tἐκκλησία\tekklēsia\tchurch\tassembly, congregation, church
+G2098\tεὐαγγέλιον\teuangelion\tgospel\tgood news, the gospel
+G1343\tδικαιοσύνη\tdikaiosynē\trighteousness\trighteousness, justice, what is right
+G1344\tδικαιόω\tdikaioō\tjustify\tto justify, declare or make righteous, vindicate
+G4151\tπνεῦμα\tpneuma\tspirit\tspirit, wind, breath; the Holy Spirit
+G2842\tκοινωνία\tkoinōnia\tfellowship\tfellowship, sharing, communion, partnership
+G2169\tεὐχαριστία\teucharistia\tthanksgiving\tthanksgiving, gratitude; the Eucharist
+G3674\tὁμοῦ\thomou\ttogether\ttogether, at the same place
+G3672\tὁμολογία\thomologia\tconfession\tconfession, profession of faith
+G1124\tγραφή\tgraphē\tscripture\ta writing; Scripture, a passage of Scripture
+G2583\tκανών\tkanōn\trule\ta measuring rod, rule, standard; later the canon of Scripture
+G2316\tθεός\ttheos\tGod\tGod, a god
+G5547\tΧριστός\tChristos\tChrist\tanointed one, Messiah, Christ
+G2962\tκύριος\tkyrios\tlord\tlord, master, owner; the Lord
+G266\tἁμαρτία\thamartia\tsin\tsin, missing the mark, wrongdoing
+G386\tἀνάστασις\tanastasis\tresurrection\trising up, resurrection
+G225\tἀλήθεια\talētheia\ttruth\ttruth, reality, sincerity
+G1680\tἐλπίς\telpis\thope\thope, expectation
+G1515\tεἰρήνη\teirēnē\tpeace\tpeace, harmony, welfare
+H1697\tדָּבָר\tdabar\tword\tword, speech, matter, thing
+H2617\tחֶסֶד\tchesed\tsteadfast love\tsteadfast love, loyal kindness, mercy
+H7307\tרוּחַ\truach\tspirit\tspirit, wind, breath
+H8451\tתּוֹרָה\ttorah\tlaw\tinstruction, teaching, law
+H7965\tשָׁלוֹם\tshalom\tpeace\tpeace, completeness, welfare
+H1285\tבְּרִית\tberit\tcovenant\tcovenant, agreement
+H3068\tיְהוָה\tYHWH\tthe LORD\tthe divine name, usually rendered the LORD
+H4899\tמָשִׁיחַ\tmashiach\tanointed\tanointed one, messiah`;
+
+async function addSampleLexicon() {
+  try {
+    if (localStorage.getItem('lr.demo.lexicon.v1')) return;
+  } catch {
+    return;
+  }
+  const v = await Vault.open(VAULT, { author: 'you' });
+  if (!(await v.listLexicons()).length) await v.importLexicon({ name: 'Sample Greek & Hebrew glossary', text: SAMPLE_LEXICON });
+  try {
+    localStorage.setItem('lr.demo.lexicon.v1', '1');
+  } catch {
+    // ignore
+  }
+}
+
 async function addScholarshipLibrary() {
   // Once only, so removing the samples keeps them removed.
   try {
@@ -295,6 +346,7 @@ const ready = (async () => {
     const startId = await seed();
     await addScholarshipViews().catch(() => undefined);
     await addScholarshipLibrary().catch(() => undefined);
+    await addSampleLexicon().catch(() => undefined);
     await backend.methods.openVault(WORLD).catch(() => undefined);
     await backend.methods.setAuthor('you');
     await backend.methods.openVault(VAULT);
@@ -306,6 +358,7 @@ const ready = (async () => {
   } else {
     await addScholarshipViews().catch(() => undefined);
     await addScholarshipLibrary().catch(() => undefined);
+    await addSampleLexicon().catch(() => undefined);
     await backend.restoreLastVault();
     // Sample projects made by an earlier version get the newer starter facts.
     if (backend.vault) await backend.methods.upgradeTemplates().catch(() => undefined);

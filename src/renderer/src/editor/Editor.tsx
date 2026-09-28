@@ -14,6 +14,7 @@ import { planBlockIds } from '../../../core/document';
 import { analysisField, envField, openEntityAtCursor, setEnv, writingExtensions, type AnalyzedDocBlock, type EditorEnv } from './extensions';
 import { formattingExtensions, paragraphKeys } from './format';
 import { spellingExtensions } from './spelling';
+import { lexiconHover } from './lexicon';
 import { useApp } from '../state';
 import { api } from '../api';
 
@@ -42,6 +43,16 @@ const markdownStyle = HighlightStyle.define([
 
 // The document editor you last typed in: the Research pane inserts quotations there.
 let lastDocView: EditorView | null = null;
+
+/** Insert text at the cursor in the last-used document. */
+export function insertText(text: string): boolean {
+  const view = lastDocView;
+  if (!view || !view.dom.isConnected) return false;
+  const sel = view.state.selection.main;
+  view.dispatch({ changes: { from: sel.from, to: sel.to, insert: text }, selection: { anchor: sel.from + text.length }, scrollIntoView: true, userEvent: 'input.paste' });
+  view.focus();
+  return true;
+}
 
 /** Insert a paragraph after the one at the cursor in the last-used document. */
 export function insertParagraph(text: string): boolean {
@@ -218,6 +229,7 @@ export function Editor(props: EditorProps) {
         syntaxHighlighting(markdownStyle),
         formattingExtensions(),
         spellingExtensions(),
+        lexiconHover,
         cmPlaceholder(props.placeholder ?? ''),
         flashField,
         writingExtensions({ stripe: !isBlock }),

@@ -19,6 +19,7 @@ import { ReviewPage, SuggestBadge, TriggerWordsPage, openReview } from './Review
 import { ResearchPane, ResearchSplitter } from './Research';
 import { ClaimsPage } from './Claims';
 import { ContradictionsPage } from './Contradictions';
+import { importLexicons } from './LexiconPanel';
 import { SpellingSettings } from './SpellingSettings';
 import { setSpellingPrefs } from '../editor/spelling';
 import { newView, addType } from './ViewsSidebar';
@@ -186,6 +187,8 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
         hint: 'Ctrl+Shift+L',
         run: () => app.setPanels({ research: true }),
       },
+      { id: 'lexicon', label: 'Lexicon: look up Greek, Hebrew or other words', hint: 'Ctrl+Shift+G', run: () => app.setPanels({ right: 'lexicon' }) },
+      { id: 'import-lexicon', label: 'Import a lexicon (Strong’s, Greek, Hebrew, glossary)…', run: () => importLexicons(app, dialogs) },
       { id: 'conflicts', label: 'Find contradictions: facts, dates, links and statements that disagree', run: () => app.openTab({ kind: 'conflicts' }) },
       { id: 'claims', label: 'Claims & evidence: weigh what supports or opposes each claim', run: () => app.openTab({ kind: 'claims' }) },
       {
@@ -299,6 +302,7 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
       else if (mod && e.shiftKey && k === 'e') newEntity();
       else if (mod && e.shiftKey && k === 'f') app.openTab({ kind: 'search', query: '' });
       else if (mod && e.shiftKey && k === 'l') app.setPanels(app.panels.research ? { research: false } : { research: true, right: null });
+      else if (mod && e.shiftKey && k === 'g') app.setPanels({ right: app.panels.right === 'lexicon' ? null : 'lexicon' });
       else if (mod && e.shiftKey && k === 'a')
         app.setPanels({
           right: app.panels.right === 'suggest' ? null : 'suggest',

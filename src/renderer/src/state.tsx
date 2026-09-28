@@ -53,7 +53,7 @@ interface AppState {
   openTab: (t: TabInput, opts?: { newTab?: boolean }) => void;
   closeTab: (key: string) => void;
   setActive: (key: string) => void;
-  panels: { right: 'context' | 'reference' | 'suggest' | null; pinnedReference: boolean; research?: boolean; researchWidth?: number };
+  panels: { right: 'context' | 'reference' | 'suggest' | 'lexicon' | null; pinnedReference: boolean; research?: boolean; researchWidth?: number };
   setPanels: (p: Partial<AppState['panels']>) => void;
   rawMarkup: boolean;
   setRawMarkup: (v: boolean) => void;

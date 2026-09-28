@@ -9,6 +9,7 @@
 //   triggers.yaml   trigger-word themes for the active scan
 //   research.yaml   saved research lookups
 //   claims.yaml     evidence attached to paragraphs marked !claim
+//   lexicons/       imported word lists (Greek, Hebrew…) as TSV
 //   .meta/          block authorship and history (keep)
 //   .index/         generated, safe to delete
 //
@@ -39,6 +40,7 @@ import { importText, type ImportOptions } from './importer';
 import { compileThemes, defaultThemes, type TriggerTheme } from './triggers';
 import { claimViews, type ClaimLedger, type EvidenceStance } from './compare';
 import { findContradictions } from './contradictions';
+import { LexiconIndex, fromTsv, languageOf, parseLexicon, readTsvMeta, toTsv, type LexHit, type LexiconMeta } from './lexicon';
 import { DEFAULT_DETECTORS, scanBlock, scanNewNames, type ScanBlock, type ScanContext, type Suggestion, type SuggestionKind } from './scan';
 import { colorFor, fallbackTemplate, resolveTemplates, STARTER_PACKS, WORLD_TEMPLATES, type StarterPack } from './templates';
 import type {
@@ -1295,6 +1297,83 @@ export class Vault {
       await this.toTrash(`views/${id}.yaml`);
       this.emit({ files: [`views/${id}.yaml`], entities: false, binder: true });
     });
+  }
+
+  // ---------------------------------------------------------------- lexicons (lexicons/*.tsv)
+
+  private lexicons = new Map<string, LexiconIndex>();
+
+  async listLexicons(): Promise<LexiconMeta[]> {
+    const out: LexiconMeta[] = [];
+    for (const f of await fs.readdir(this.abs('lexicons')).catch(() => [] as string[])) {
+      if (!f.endsWith('.tsv')) continue;
+      const text = await fs.readFile(this.abs(`lexicons/${f}`), 'utf8').catch(() => '');
+      const meta = readTsvMeta(text.slice(0, text.indexOf('\n')));
+      if (meta) out.push({ id: f.replace(/\.tsv$/, ''), file: `lexicons/${f}`, ...meta });
+    }
+    return out.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  private async lexiconIndexes(ids?: string[]): Promise<LexiconIndex[]> {
+    const metas = (await this.listLexicons()).filter((m) => !ids?.length || ids.includes(m.id));
+    const out: LexiconIndex[] = [];
+    for (const m of metas) {
+      let idx = this.lexicons.get(m.id);
+      if (!idx || idx.meta.count !== m.count || idx.meta.name !== m.name) {
+        idx = new LexiconIndex(m, fromTsv(await fs.readFile(this.abs(m.file), 'utf8')));
+        this.lexicons.set(m.id, idx);
+      }
+      out.push(idx);
+    }
+    return out;
+  }
+
+  /** Import a lexicon file (see lexicon.ts for the formats understood). */
+  importLexicon(opts: { name: string; text: string }) {
+    return this.exclusive(async () => {
+      const entries = parseLexicon(opts.text);
+      const name = opts.name.trim() || 'Lexicon';
+      await fs.mkdir(this.abs('lexicons'), { recursive: true });
+      const base = slugify(name) || 'lexicon';
+      let id = base;
+      for (let n = 2; existsSync(this.abs(`lexicons/${id}.tsv`)); n++) id = `${base} ${n}`;
+      const language = languageOf(entries);
+      await this.writeRel(`lexicons/${id}.tsv`, toTsv({ name, language, count: entries.length }, entries));
+      this.lexicons.delete(id);
+      this.emit({ files: [`lexicons/${id}.tsv`], entities: false });
+      return { id, name, language, count: entries.length, sample: entries.slice(0, 3) };
+    });
+  }
+
+  deleteLexicon(id: string) {
+    return this.exclusive(async () => {
+      await this.toTrash(`lexicons/${id}.tsv`);
+      this.lexicons.delete(id);
+      this.emit({ files: [`lexicons/${id}.tsv`], entities: false });
+    });
+  }
+
+  async lexiconLookup(q: string, opts: { limit?: number; ids?: string[]; english?: boolean } = {}): Promise<LexHit[]> {
+    const limit = opts.limit ?? 30;
+    const out: LexHit[] = [];
+    for (const idx of await this.lexiconIndexes(opts.ids)) out.push(...idx.lookup(q, limit, opts.english ?? true));
+    const rank = { strong: 0, exact: 1, translit: 2, prefix: 3, english: 4 } as const;
+    return out.sort((a, b) => rank[a.match] - rank[b.match]).slice(0, limit);
+  }
+
+  /** The best entry for each word (for hovering over Greek or Hebrew while writing). */
+  async lexiconWords(words: string[]): Promise<Record<string, LexHit | null>> {
+    const idx = await this.lexiconIndexes();
+    const out: Record<string, LexHit | null> = {};
+    for (const w of words.slice(0, 200)) {
+      let best: LexHit | null = null;
+      for (const x of idx) {
+        const h = x.lookup(w, 1, false)[0];
+        if (h && (!best || (best.match !== 'exact' && best.match !== 'strong'))) best = h;
+      }
+      out[w] = best;
+    }
+    return out;
   }
 
   /** Things that cannot all be true (see contradictions.ts); dismissed ones stay hidden. */
