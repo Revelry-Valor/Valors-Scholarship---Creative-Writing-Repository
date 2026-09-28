@@ -10,8 +10,12 @@ type Bridge = {
 declare global {
   interface Window {
     livingRepo?: Bridge;
+    /** The browser demo runs the backend inside the page. */
+    __lrBackend?: Omit<Bridge, 'platform'> & { ready: Promise<void>; reset(): void };
   }
 }
+
+const bridge = (): Pick<Bridge, 'call' | 'onEvent'> | undefined => window.livingRepo ?? window.__lrBackend;
 
 async function httpCall(method: string, args: unknown[]) {
   const res = await fetch(`/api/${method}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(args) });
@@ -25,7 +29,8 @@ type Methods = {
 export const api = new Proxy({} as Methods, {
   get(_t, method: string) {
     return async (...args: unknown[]) => {
-      const r = window.livingRepo ? await window.livingRepo.call(method, args) : await httpCall(method, args);
+      const b = bridge();
+      const r = b ? await b.call(method, args) : await httpCall(method, args);
       if (!r.ok) throw new Error(r.error ?? 'Unknown error');
       return r.value;
     };
@@ -33,7 +38,8 @@ export const api = new Proxy({} as Methods, {
 });
 
 export function onBackendEvent(fn: (e: BackendEvent) => void): () => void {
-  if (window.livingRepo) return window.livingRepo.onEvent(fn);
+  const b = bridge();
+  if (b) return b.onEvent(fn);
   const es = new EventSource('/api/events');
   es.onmessage = (m) => fn(JSON.parse(m.data));
   return () => es.close();

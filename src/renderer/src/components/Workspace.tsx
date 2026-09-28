@@ -16,6 +16,8 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
   const dialogs = useDialogs();
   const [palette, setPalette] = useState<'switch' | 'command' | null>(null);
   const [theme, setTheme] = useState<Theme>(currentTheme());
+  const [navOpen, setNavOpen] = useState(false);
+  useEffect(() => setNavOpen(false), [app.active]);
 
   const activeTab = app.tabs.find((t) => t.key === app.active) ?? null;
 
@@ -89,8 +91,27 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
       },
       { id: 'reveal', label: 'Show vault folder on disk', run: async () => app.notify(`Vault folder: ${await api.revealInFolder()}`) },
       { id: 'switch', label: 'Switch project…', run: onCloseVault },
+      ...(window.__lrBackend
+        ? [
+            {
+              id: 'reset-demo',
+              label: 'Reset the sample project (erases your changes in this browser)',
+              run: async () => {
+                const ok = await dialogs.choose({
+                  title: 'Reset the sample project?',
+                  message: <p>Everything you wrote in this browser is erased and the original sample comes back.</p>,
+                  choices: [
+                    { label: 'Reset', value: true, kind: 'danger' },
+                    { label: 'Cancel', value: false, kind: 'primary' },
+                  ],
+                });
+                if (ok) window.__lrBackend?.reset();
+              },
+            },
+          ]
+        : []),
     ],
-    [app, newEntity, newEntry, toggleReference, theme, cycleTheme, setAuthor, onCloseVault],
+    [app, dialogs, newEntity, newEntry, toggleReference, theme, cycleTheme, setAuthor, onCloseVault],
   );
 
   useEffect(() => {
@@ -136,10 +157,14 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
   };
 
   return (
-    <div className={`workspace ${app.panels.right ? 'with-right' : ''}`}>
+    <div className={`workspace ${app.panels.right ? 'with-right' : ''} ${navOpen ? 'nav-open' : ''}`}>
       <Sidebar onSwitchVault={onCloseVault} />
+      {navOpen && <div className="nav-scrim" onClick={() => setNavOpen(false)} />}
       <div className="center">
         <div className="tabbar" role="tablist">
+          <button className="nav-toggle" aria-label="Show binder and entities" onClick={() => setNavOpen((x) => !x)}>
+            ☰
+          </button>
           {app.tabs.map((t) => (
             <div
               key={t.key}
@@ -256,6 +281,7 @@ function StatusBar({ onAuthor, theme, onTheme }: { onAuthor: () => void; theme: 
   return (
     <footer className="statusbar">
       <span className={`save-state save-${app.saveState}`}>{saveLabel}</span>
+      {window.__lrBackend && <span className="demo-note">Sample project · saved in this browser only</span>}
       <span>
         {c.entries} entries · {c.entities} entities · {c.blocks.toLocaleString()} blocks
       </span>
