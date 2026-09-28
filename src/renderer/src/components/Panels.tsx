@@ -62,6 +62,7 @@ function QuickReference() {
           ['Ctrl+B / I / U', 'Bold / italic / underline'],
           ['Ctrl+Shift+X', 'Strikethrough'],
           ['Ctrl+Shift+H', 'Highlight'],
+          ['Ctrl+Shift+K', 'Mark important (paragraph, or selected phrase)'],
           ['Ctrl+Alt+1/2/3', 'Title / heading / subheading'],
           ['Ctrl+Alt+0', 'Normal text'],
           ['Ctrl+Shift+8 / 7', 'Bulleted / numbered list'],

@@ -10,7 +10,7 @@ import { analysisField, envField } from './extensions';
 
 // ------------------------------------------------------------------ inline styles
 
-export type InlineStyle = 'bold' | 'italic' | 'underline' | 'strike' | 'highlight';
+export type InlineStyle = 'bold' | 'italic' | 'underline' | 'strike' | 'highlight' | 'key';
 
 const MARKERS: Record<InlineStyle, [string, string]> = {
   bold: ['**', '**'],
@@ -18,6 +18,7 @@ const MARKERS: Record<InlineStyle, [string, string]> = {
   underline: ['<u>', '</u>'],
   strike: ['~~', '~~'],
   highlight: ['==', '=='],
+  key: ['!!', '!!'],
 };
 
 /** Wrap the selection in a style, or remove it if the selection already has it. */
@@ -169,7 +170,36 @@ export function insertMarkup(view: EditorView, kind: 'tag' | 'create' | 'topic' 
   return true;
 }
 
+/** Toggle a paragraph mark (`!key` / `!check`) on the paragraph(s) at the cursor. */
+export function toggleMark(view: EditorView, mark: 'key' | 'check'): boolean {
+  const { state } = view;
+  const blocks = state.field(analysisField, false) ?? [];
+  const sel = state.selection.main;
+  const targets = blocks.filter((b) => b.kind !== 'heading' && b.to >= sel.from && b.from <= sel.to);
+  if (!targets.length) return false;
+  const removing = targets.every((b) => b.analysis.marks.includes(mark));
+  const changes: Array<{ from: number; to: number; insert: string }> = [];
+  for (const b of targets) {
+    const has = new RegExp(`\\s?!${mark}(?![\\p{L}\\p{N}_])`, 'u').exec(b.text);
+    if (removing && has) changes.push({ from: b.from + has.index, to: b.from + has.index + has[0].length, insert: '' });
+    if (!removing && !has) {
+      const end = b.from + b.text.replace(/\s+$/, '').length;
+      changes.push({ from: end, to: end, insert: ` !${mark}` });
+    }
+  }
+  const cs = state.changes(changes);
+  view.dispatch({ changes: cs, selection: state.selection.map(cs, -1), userEvent: 'input.format' });
+  view.focus();
+  return true;
+}
+
+/** ★ Important: with text selected, mark that phrase; otherwise mark the whole paragraph. */
+export function markImportant(view: EditorView): boolean {
+  return view.state.selection.main.empty ? toggleMark(view, 'key') : toggleInline(view, 'key');
+}
+
 export const formatKeymap = keymap.of([
+  { key: 'Mod-Shift-k', run: markImportant },
   { key: 'Mod-b', run: (v) => toggleInline(v, 'bold') },
   { key: 'Mod-i', run: (v) => toggleInline(v, 'italic') },
   { key: 'Mod-u', run: (v) => toggleInline(v, 'underline') },
@@ -199,6 +229,7 @@ export function activeInline(state: EditorState): Set<InlineStyle> {
   for (const [style, re] of [
     ['underline', /<u>(.*?)<\/u>/g],
     ['highlight', /==([^=\n]+)==/g],
+    ['key', /!!([^!\n]+)!!/g],
   ] as const) {
     re.lastIndex = 0;
     for (let m; (m = re.exec(line.text)); ) if (rel > m.index && rel < m.index + m[0].length) out.add(style);
@@ -292,6 +323,7 @@ function buildPreview(view: EditorView): DecorationSet {
     const text = state.sliceDoc(from, to);
     for (const [re, cls, open, close] of [
       [/==([^=\n]+)==/g, 'cm-highlight', 2, 2],
+      [/!!([^!\s][^!\n]*?[^!\s]|[^!\s])!!/g, 'cm-keyphrase', 2, 2],
       [/<u>(.*?)<\/u>/g, 'cm-underline', 3, 4],
     ] as const) {
       re.lastIndex = 0;

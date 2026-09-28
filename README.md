@@ -31,6 +31,8 @@ On first launch you get the **project picker**: create a vault from a starter pa
 | Click a paragraph on a profile | Edit it in place — the change is saved to the entry it lives in and appears everywhere |
 | Delete a paragraph that is on other pages | "This block appears on 3 pages" — delete everywhere, I'm moving it, or restore |
 
+**Important details:** ★ Important (Ctrl+Shift+K) marks the paragraph at the cursor (`!key`), or just the selected words (`!!like this!!`); ⚑ marks something to verify (`!check`). Marked details are tinted on the page, listed in a Key details box at the top of every page they're filed to, and gathered on the ★ Key details page (top bar), grouped by document.
+
 **Timelines & Trees** (sidebar) are saved charts drawn from what you wrote — never typed by hand:
 
 | Chart | Drawn from |

@@ -25,6 +25,8 @@ export interface BlockView {
   eventDate?: { text: string; sort?: number };
   warnings: BlockRecord['warnings'];
   filedTo: Array<{ id: string; name: string; color: string }>;
+  marks: string[];
+  keyPhrases: string[];
 }
 
 export interface FactValue {
@@ -71,6 +73,8 @@ export interface ProfileView {
    * and kept in that document's reading order. `name` is '' for unsectioned mentions.
    */
   elsewhere: Array<{ name: string; groups: SourceGroup[] }>;
+  /** Paragraphs marked !key or !check, or containing !!phrases!!, about this entity. */
+  keyDetails: BlockView[];
 }
 
 export interface SourceGroup {
@@ -97,6 +101,8 @@ export function blockView(v: Vault, b: BlockRecord, forEntity?: string): BlockVi
     pages: v.blockPages(b.id).length,
     eventDate: b.eventDate,
     warnings: b.warnings,
+    marks: b.marks ?? [],
+    keyPhrases: b.keyPhrases ?? [],
     filedTo: b.filedTo.map((f) => {
       const e = v.entities.get(f.entityId);
       return { id: f.entityId, name: e?.name ?? f.entityId, color: e ? v.chip(e).color : '#888' };
@@ -321,6 +327,7 @@ export function buildProfile(v: Vault, entityId: string): ProfileView {
     timeline,
     stats: { blocks: filed.length, sources: sources.size },
     elsewhere,
+    keyDetails: sortBlocks(v, filed.filter(isMarked)).map((b) => blockView(v, b, entityId)),
   };
 }
 
@@ -413,4 +420,33 @@ export function searchBlocks(v: Vault, query: string, filters: SearchFilters = {
     hits.push({ block: blockView(v, b), snippet, score: terms.reduce((n, t) => n + lower.split(t).length - 1, 0) });
   }
   return hits.sort((a, b) => b.score - a.score).slice(0, limit).map(({ score: _s, ...h }) => h);
+}
+
+// ---------------------------------------------------------------- key details
+
+export function isMarked(b: BlockRecord): boolean {
+  return (b.marks?.length ?? 0) > 0 || (b.keyPhrases?.length ?? 0) > 0;
+}
+
+export interface KeyDetailFilters {
+  mark?: 'key' | 'check' | 'phrase';
+  entityId?: string;
+}
+
+/** Every marked paragraph in the project, grouped by the document it is in, in reading order. */
+export function keyDetails(v: Vault, filters: KeyDetailFilters = {}): SourceGroup[] {
+  const groups = new Map<string, BlockRecord[]>();
+  for (const b of v.blocks.values()) {
+    if (!isMarked(b) || v.meta.get(b.id)?.status === 'deleted') continue;
+    if (filters.mark === 'phrase' && !b.keyPhrases?.length) continue;
+    if ((filters.mark === 'key' || filters.mark === 'check') && !b.marks?.includes(filters.mark)) continue;
+    if (filters.entityId && !b.filedTo.some((f) => f.entityId === filters.entityId)) continue;
+    const key = `${b.owner.kind}:${b.owner.id}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(b);
+  }
+  return [...groups.values()]
+    .map((list) => list.sort((a, b) => a.position - b.position).map((b) => blockView(v, b)))
+    .map((views) => ({ source: views[0].source, blocks: views }))
+    .sort((a, b) => a.source.title.localeCompare(b.source.title));
 }

@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Vault } from '../src/core/vault';
-import { buildProfile, quickSwitch, searchBlocks } from '../src/core/views';
+import { buildProfile, keyDetails, quickSwitch, searchBlocks } from '../src/core/views';
 import { splitBlocks } from '../src/core/document';
 import { factPickerFields } from '../src/core/editing';
 
@@ -353,5 +353,17 @@ describe('Phase 1 acceptance', () => {
     await v.saveTemplate({ ...tpl, sections: [...tpl.sections, 'Travels'], fields: [...tpl.fields, { key: 'nickname', label: 'Nickname', kind: 'text' }] });
     expect(v.template('church-father').sections).toContain('Travels');
     expect(buildProfile(v, s).facts.some((f) => f.key === 'nickname')).toBe(true);
+  });
+
+  it('marked paragraphs show in the page\'s Key details and the project-wide list', async () => {
+    const { s: sc } = await scouchAndPineapple();
+    const entry = await v.createEntry({ title: 'Notes' });
+    await v.saveEntry(entry.id, '@Scouch burned his letters in 1330. !key\n\n@Scouch may have met the emperor. !check\n\nOrdinary line about @Scouch.\n\nThe !!third letter!! survives.\n');
+    expect(buildProfile(v, sc).keyDetails.map((b) => b.text.slice(0, 20))).toEqual(['@Scouch burned his l', '@Scouch may have met']);
+    const all = keyDetails(v);
+    expect(all).toHaveLength(1);
+    expect(all[0].blocks).toHaveLength(3);
+    expect(keyDetails(v, { mark: 'check' })[0].blocks).toHaveLength(1);
+    expect(keyDetails(v, { mark: 'phrase' })[0].blocks[0].keyPhrases).toEqual(['third letter']);
   });
 });

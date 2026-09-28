@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { EditorView } from '@codemirror/view';
 import { undo, redo } from '@codemirror/commands';
-import { activeInline, currentParagraphStyle, insertMarkup, setParagraphStyle, toggleInline, type InlineStyle, type ParagraphStyle } from '../editor/format';
+import { activeInline, currentParagraphStyle, insertMarkup, markImportant, setParagraphStyle, toggleInline, toggleMark, type InlineStyle, type ParagraphStyle } from '../editor/format';
+import { analysisField, blockAt } from '../editor/extensions';
 import type { DocFormat } from '../../../core/types';
 
 export const FONTS: Array<{ id: string; label: string; css: string }> = [
@@ -81,6 +82,7 @@ export function FormatBar({
   void tick;
   const para = view ? currentParagraphStyle(view.state) : 'normal';
   const active = view ? activeInline(view.state) : new Set<InlineStyle>();
+  const blockMarks = view && view.state.field(analysisField, false) ? blockAt(view.state, view.state.selection.main.head)?.analysis.marks ?? [] : [];
   const run = (fn: (v: EditorView) => void) => () => {
     if (view) fn(view);
   };
@@ -118,6 +120,19 @@ export function FormatBar({
           {b.label}
         </button>
       ))}
+      <span className="fb-sep" />
+      <button
+        className={`fb-btn fb-key ${blockMarks.includes('key') || active.has('key') ? 'on' : ''}`}
+        title="Mark important (Ctrl+Shift+K). Select words to mark just that phrase."
+        aria-pressed={blockMarks.includes('key') || active.has('key')}
+        onMouseDown={keep}
+        onClick={run((v) => markImportant(v))}
+      >
+        ★ Important
+      </button>
+      <button className={`fb-btn fb-check ${blockMarks.includes('check') ? 'on' : ''}`} title="Mark to check later (needs verifying)" aria-pressed={blockMarks.includes('check')} onMouseDown={keep} onClick={run((v) => toggleMark(v, 'check'))}>
+        ⚑
+      </button>
       <span className="fb-sep" />
       <button className={`fb-btn ${para === 'bullet' ? 'on' : ''}`} title="Bulleted list (Ctrl+Shift+8)" onMouseDown={keep} onClick={run((v) => setParagraphStyle(v, 'bullet'))}>
         •≡

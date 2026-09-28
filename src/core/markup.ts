@@ -19,6 +19,10 @@ export type Resolution =
   | { status: 'ambiguous'; ids: string[] }
   | { status: 'missing' };
 
+/** Paragraph marks: `!key` (important) and `!check` (needs verifying). */
+export const MARK_KINDS = ['key', 'check'] as const;
+export type MarkKind = (typeof MARK_KINDS)[number];
+
 export const CONFIDENCE_LEVELS = ['certain', 'probable', 'possible', 'disputed', 'legendary'] as const;
 export type Confidence = (typeof CONFIDENCE_LEVELS)[number];
 
@@ -29,6 +33,8 @@ export type Token =
   | { kind: 'relation'; from: number; to: number; type: string }
   | { kind: 'topic'; from: number; to: number; name: string }
   | { kind: 'pin'; from: number; to: number }
+  | { kind: 'mark'; from: number; to: number; mark: MarkKind }
+  | { kind: 'keyspan'; from: number; to: number; inner: string }
   | { kind: 'note'; from: number; to: number; closed: boolean }
   | { kind: 'blockId'; from: number; to: number; id: string }
   | { kind: 'code'; from: number; to: number }
@@ -279,6 +285,27 @@ export function tokenize(text: string, resolver?: NameResolver): Token[] {
       }
     }
 
+    // !key / !check — mark the whole paragraph
+    if (ch === '!' && text[i + 1] !== '!' && isBoundaryBefore(text, i)) {
+      const m = /^!(key|check)(?![\p{L}\p{N}_])/u.exec(text.slice(i));
+      if (m) {
+        tokens.push({ kind: 'mark', from: i, to: i + m[0].length, mark: m[1] as MarkKind });
+        i += m[0].length;
+        continue;
+      }
+    }
+
+    // !!important phrase!!
+    if (ch === '!' && text[i + 1] === '!' && text[i + 2] && !/[\s!]/.test(text[i + 2]) && (i === 0 || text[i - 1] !== '!')) {
+      const close = text.indexOf('!!', i + 3);
+      const nl = text.indexOf('\n', i);
+      if (close !== -1 && (nl === -1 || close < nl) && !/\s/.test(text[close - 1])) {
+        tokens.push({ kind: 'keyspan', from: i, to: close + 2, inner: text.slice(i + 2, close) });
+        i = close + 2;
+        continue;
+      }
+    }
+
     // ^pin
     if (ch === '^' && text.startsWith('^pin', i) && !isLetter(text[i + 4]) && isBoundaryBefore(text, i)) {
       tokens.push({ kind: 'pin', from: i, to: i + 4 });
@@ -439,6 +466,9 @@ export function plainText(text: string, resolver?: NameResolver): string {
         break;
       case 'code':
         out += text.slice(t.from, t.to);
+        break;
+      case 'keyspan':
+        out += t.inner;
         break;
       default:
         break;

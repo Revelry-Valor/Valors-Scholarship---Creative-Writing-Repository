@@ -370,6 +370,8 @@ export class Vault {
         warnings: a.warnings,
         eventDate: a.eventDate,
         pinned: a.pinned,
+        marks: a.marks,
+        keyPhrases: a.keyPhrases,
       });
     });
   }

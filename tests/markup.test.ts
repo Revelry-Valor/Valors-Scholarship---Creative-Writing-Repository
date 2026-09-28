@@ -60,6 +60,14 @@ describe('tag tokenizer', () => {
     expect(toks.find((t) => t.kind === 'topic')).toMatchObject({ name: 'grace and repentance' });
   });
 
+  it('reads importance marks and important phrases, but not ordinary exclamations', () => {
+    const toks = tokenize('He never returned. !key The !!third letter!! matters. !check', names);
+    expect(toks.filter((t) => t.kind === 'mark').map((t) => (t as { mark: string }).mark)).toEqual(['key', 'check']);
+    expect(toks.find((t) => t.kind === 'keyspan')).toMatchObject({ inner: 'third letter' });
+    expect(plainText('The !!third letter!! matters. !key', names)).toBe('The third letter matters.');
+    expect(tokenize('What!! A surprise!! Truly! Keyed', names).filter((t) => t.kind === 'mark' || t.kind === 'keyspan')).toHaveLength(0);
+  });
+
   it('does not parse inside private notes or code', () => {
     expect(tags('%% @Apple Scouch %% and `@Chamberlain Pineapple`')).toHaveLength(0);
   });

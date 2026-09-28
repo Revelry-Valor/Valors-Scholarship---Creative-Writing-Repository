@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { watch, type FSWatcher } from 'chokidar';
 import { Vault, type BinderParent, type ChangeEvent } from '../core/vault';
-import { buildProfile, blockView, quickSwitch, searchBlocks, type SearchFilters } from '../core/views';
+import { buildProfile, blockView, keyDetails, quickSwitch, searchBlocks, type KeyDetailFilters, type SearchFilters } from '../core/views';
 import { STARTER_PACKS } from '../core/templates';
 import type { EntryStatus, TemplateDef, ViewDef } from '../core/types';
 import { buildGraph, buildTimeline } from '../core/graph';
@@ -152,6 +152,7 @@ export class Backend {
     createView: async (opts: Parameters<Vault['createView']>[0]) => this.v().createView(opts),
     saveView: async (def: ViewDef) => this.v().saveView(def),
     deleteView: async (id: string) => this.v().deleteView(id),
+    keyDetails: async (filters?: KeyDetailFilters) => keyDetails(this.v(), filters),
     graph: async () => buildGraph(this.v()),
     timeline: async () => buildTimeline(this.v()),
     getEntityNotes: async (id: string) => {

@@ -44,6 +44,9 @@ export const QUICK_REFERENCE: Array<{ syntax: string; meaning: string; example: 
   { syntax: '#topic', meaning: 'Tag the block with a topic', example: '#grace-and-repentance' },
   { syntax: '## Heading @', meaning: 'Heading owns every block beneath it', example: '## Apple Scouch @' },
   { syntax: '## Heading @Name', meaning: 'Heading filed to Name', example: "### Pineapple's reply @Chamberlain Pineapple" },
+  { syntax: '!key', meaning: 'Mark the paragraph important (Ctrl+Shift+K)', example: 'He burned the letters. !key' },
+  { syntax: '!check', meaning: 'Mark the paragraph to verify later', example: 'Born in 1280? !check' },
+  { syntax: '!!phrase!!', meaning: 'Mark just a phrase as important', example: 'the !!third letter!! survives' },
   { syntax: '^pin', meaning: 'Use this block as the profile summary', example: 'He was a gardener-bishop. ^pin' },
   { syntax: '%% note %%', meaning: 'Private margin note, never shown on views', example: '%% check the date %%' },
 ];

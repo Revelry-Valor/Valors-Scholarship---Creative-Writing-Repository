@@ -160,6 +160,10 @@ export interface BlockRecord {
   warnings: BlockWarning[];
   eventDate?: { text: string; sort?: number };
   pinned: boolean;
+  /** Paragraph marks (`!key`, `!check`). */
+  marks: string[];
+  /** Phrases marked important inside the paragraph (`!!…!!`). */
+  keyPhrases: string[];
 }
 
 export interface BinderNode {

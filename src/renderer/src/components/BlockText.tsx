@@ -98,6 +98,20 @@ export function BlockText({ text, onOpenEntity, highlight }: { text: string; onO
       case 'code':
         parts.push(<code key={key}>{body.slice(t.from + 1, t.to - 1)}</code>);
         return;
+      case 'keyspan':
+        parts.push(
+          <strong key={key} className="key-phrase" title="Marked important">
+            {t.inner}
+          </strong>,
+        );
+        return;
+      case 'mark':
+        parts.push(
+          <span key={key} className={`badge mark-badge mark-${t.mark}`}>
+            {t.mark === 'key' ? '★ Important' : '⚑ Check this'}
+          </span>,
+        );
+        return;
       default:
         return; // notes, pins and ids are never shown on views
     }

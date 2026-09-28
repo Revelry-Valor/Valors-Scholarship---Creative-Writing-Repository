@@ -10,7 +10,8 @@ export type Tab =
   | { key: string; kind: 'entry'; id: string; focusBlock?: string }
   | { key: string; kind: 'entity'; id: string; focusBlock?: string }
   | { key: string; kind: 'search'; query: string }
-  | { key: string; kind: 'view'; id: string };
+  | { key: string; kind: 'view'; id: string }
+  | { key: string; kind: 'marks' };
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 export type TabInput = DistributiveOmit<Tab, 'key'>;
@@ -69,7 +70,7 @@ export function useApp(): AppState {
 }
 
 function tabKey(t: TabInput): string {
-  return t.kind === 'search' ? 'search' : `${t.kind}:${t.id}`;
+  return t.kind === 'search' ? 'search' : t.kind === 'marks' ? 'marks' : `${t.kind}:${t.id}`;
 }
 
 function loadTabs(root: string): { tabs: Tab[]; active: string | null } {

@@ -40,6 +40,8 @@ export interface AnalyzedBlock {
   creates: PendingCreate[];
   eventDate?: { text: string; sort?: number };
   pinned: boolean;
+  marks: string[];
+  keyPhrases: string[];
   /** Title of the nearest heading above (or this heading's own title). */
   headingTitle?: string;
 }
@@ -79,6 +81,8 @@ function analyzeOne(b: BlockInput, stack: StackEntry[], ctx: AnalysisContext): A
   const inline = new Map<string, { section?: string }>();
   const resolvedTags = new Map<TagToken, string>();
   let pinned = false;
+  const marks: string[] = [];
+  const keyPhrases: string[] = [];
 
   const level = b.kind === 'heading' ? b.headingLevel ?? headingLevel(text) : 0;
   let ownTitle: string | undefined;
@@ -120,6 +124,12 @@ function analyzeOne(b: BlockInput, stack: StackEntry[], ctx: AnalysisContext): A
       }
       case 'pin':
         pinned = true;
+        break;
+      case 'mark':
+        if (!marks.includes(t.mark)) marks.push(t.mark);
+        break;
+      case 'keyspan':
+        keyPhrases.push(t.inner);
         break;
       case 'unclosed':
         warnings.push({ from: t.from, to: t.to, code: 'unclosed', message: `Unclosed ${t.what}` });
@@ -285,6 +295,8 @@ function analyzeOne(b: BlockInput, stack: StackEntry[], ctx: AnalysisContext): A
     creates,
     eventDate,
     pinned,
+    marks,
+    keyPhrases,
     headingTitle: nearestTitle,
   };
 }

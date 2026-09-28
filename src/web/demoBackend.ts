@@ -29,6 +29,7 @@ async function seed() {
 - Open the topic "prophecies regarding the jews" under Entities. It gathers paragraphs from two documents and keeps each document's paragraphs together, in order.
 - Profiles are pages you write on: open Apple Scouch and type under "Life". Paragraphs written elsewhere appear under their heading. A heading you add becomes a new section.
 - Family facts link both ways: after a tag, type { and choose mother, children, friends… Pineapple lists Scouch as a teacher, so Scouch's page lists Pineapple as a student.
+- Mark important details: put the cursor in a paragraph and press ★ Important (Ctrl+Shift+K), or select a few words first to mark just them. ⚑ marks something to check later. Marked details appear at the top of each person's page and under ★ Key details in the top bar.
 - Press Ctrl+O to jump anywhere. "Commands ▾" and "? Guide" in the top bar list every command and all the markup.
 - Delete a whole paragraph that is filed to a profile, and you'll be asked before it disappears from those pages.
 `,
@@ -39,9 +40,9 @@ async function seed() {
     e.id,
     `## Apple Scouch @
 
-@Apple Scouch wrote @On the Vine in {year: 1313}, arguing that grace precedes repentance (cf. Eph 2:8–9).
+@Apple Scouch wrote @On the Vine in {year: 1313}, arguing that grace precedes repentance (cf. Eph 2:8–9). !key
 
-He taught in the northern province for most of his life, and his students remembered him as a gentle but stubborn teacher. %% check the dates in Harlow %%
+He taught in the northern province for most of his life, and his students remembered him as a !!gentle but stubborn!! teacher. %% check the dates in Harlow %%
 
 @Chamberlain Pineapple {teachers: @Apple Scouch} studied under him before breaking with his theology.
 
@@ -127,13 +128,13 @@ async function seedWorld() {
 
 @Princess Lena {born: 409} {father: @King Aldric} {mother: @Queen Mera} {friends: @Sera of Carrow} preferred the library to the court.
 
-@Kael {born: 430} {father: @Prince Tomas} {mother: @Sera of Carrow} would inherit a divided realm.
+@Kael {born: 430} {father: @Prince Tomas} {mother: @Sera of Carrow} would inherit a divided realm. !check
 `,
   );
   const wars = await v.createEntry({ title: 'The wars of the north' });
   await v.saveEntry(
     wars.id,
-    `In {year: 412} @King Aldric of @Varenhold besieged @Carrow Keep, and after three months it fell.
+    `In {year: 412} @King Aldric of @Varenhold besieged @Carrow Keep, and after three months it fell. !key
 
 @Varenhold >enemy_of> @Carrow from the siege onward, and @Varenhold {vassals: @Carrow} by {year: 420}.
 

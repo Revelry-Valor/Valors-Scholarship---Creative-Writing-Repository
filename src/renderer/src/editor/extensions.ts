@@ -177,6 +177,15 @@ function buildDecorations(view: EditorView): { all: DecorationSet; atomic: Decor
       const hashes = /^#{1,6}\s/.exec(b.text);
       if (hashes && !raw) ranges.push(Decoration.mark({ class: 'cm-heading-mark' }).range(base, base + hashes[0].length));
     }
+    // Marked paragraphs are tinted, so important details stand out on the page.
+    const markCls = b.analysis.marks.includes('key') ? 'cm-key-line' : b.analysis.marks.includes('check') ? 'cm-check-line' : '';
+    if (markCls) {
+      for (let p = base; p <= b.to; ) {
+        const line = state.doc.lineAt(p);
+        ranges.push(Decoration.line({ class: markCls }).range(line.from));
+        p = line.to + 1;
+      }
+    }
     if (b.kind === 'quote') {
       for (let p = base; p <= b.to; ) {
         const line = state.doc.lineAt(p);
@@ -285,6 +294,10 @@ function describeToken(t: Token, env: EditorEnv, warning?: string): { widget: Wi
     }
     case 'pin':
       return { widget: new BadgeWidget('', '📌', 'cm-badge-pin', 'Pinned as the profile summary'), color: grey };
+    case 'mark':
+      return t.mark === 'key'
+        ? { widget: new BadgeWidget('', '★ Important', 'cm-badge-key', 'Marked important — listed in Key details and on its pages'), color: 'var(--key)' }
+        : { widget: new BadgeWidget('', '⚑ Check this', 'cm-badge-check', 'Marked to verify — listed in Key details'), color: 'var(--warn)' };
     default:
       return null;
   }
@@ -573,6 +586,15 @@ function atCompletions(context: CompletionContext): CompletionResult | null {
         apply: (view) => {
           view.dispatch({ changes: { from, to, insert: '>' }, selection: { anchor: from + 1 } });
           setTimeout(() => startCompletion(view), 0);
+        },
+      },
+      {
+        label: 'Mark important',
+        detail: '!key',
+        type: 'menu',
+        boost: 94,
+        apply: (view) => {
+          view.dispatch({ changes: { from, to, insert: '!key' }, selection: { anchor: from + 4 } });
         },
       },
       {

@@ -13,6 +13,7 @@ import { elsewhereExtension, setElsewhere, slotKey } from '../editor/elsewhere';
 import { useDialogs } from './Dialogs';
 import { FormatBar, formatStyle, loadDefaultFormat } from './FormatBar';
 import { TemplateEditor } from './TemplateEditor';
+import { KeyDetailsBox } from './KeyDetails';
 import type { BlockView, FactView, SourceGroup } from '../../../core/views';
 import type { DocFormat } from '../../../core/types';
 import { FAMILY_FIELDS } from '../../../core/templates';
@@ -146,6 +147,8 @@ export function ProfileView({ id, focusBlock }: { id: string; focusBlock?: strin
               <Summary id={id} summary={e.summary} />
             )}
           </header>
+
+          <KeyDetailsBox items={p.keyDetails} />
 
           <ProfileDocument
             id={id}
