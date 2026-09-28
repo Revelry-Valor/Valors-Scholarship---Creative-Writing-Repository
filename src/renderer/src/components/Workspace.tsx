@@ -1,0 +1,280 @@
+// The main window: sidebar | tabs + document | right panel, with a status bar.
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { api } from '../api';
+import { useApp, type Tab } from '../state';
+import { Sidebar } from './Sidebar';
+import { EntryView } from './EntryView';
+import { ProfileView } from './ProfileView';
+import { SearchView } from './SearchView';
+import { RightPanel } from './Panels';
+import { Palette, type Command } from './Palette';
+import { useDialogs } from './Dialogs';
+import { applyTheme, currentTheme, type Theme } from '../theme';
+
+export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
+  const app = useApp();
+  const dialogs = useDialogs();
+  const [palette, setPalette] = useState<'switch' | 'command' | null>(null);
+  const [theme, setTheme] = useState<Theme>(currentTheme());
+
+  const activeTab = app.tabs.find((t) => t.key === app.active) ?? null;
+
+  const newEntity = useCallback(
+    async (presetName?: string) => {
+      const type = await dialogs.pick({
+        title: presetName ? `Create “${presetName}” as…` : 'New entity — pick a type',
+        items: app.nameData.templates.map((x) => ({ label: x.name, detail: x.sections.slice(0, 4).join(' · '), value: x.id, color: x.color })),
+      });
+      if (!type) return;
+      const name = presetName ?? (await dialogs.prompt({ title: `New ${app.templates.get(type)?.name ?? type}`, placeholder: 'Name', okLabel: 'Create' }));
+      if (!name) return;
+      try {
+        const chip = await api.createEntity({ name, type });
+        await app.refreshNames();
+        app.openTab({ kind: 'entity', id: chip.id });
+      } catch (err) {
+        app.notify((err as Error).message, 'error');
+      }
+    },
+    [app, dialogs],
+  );
+
+  const newEntry = useCallback(async () => {
+    const title = await dialogs.prompt({ title: 'New document', placeholder: 'Title', okLabel: 'Create' });
+    if (!title) return;
+    const e = await api.createEntry({ title });
+    app.openTab({ kind: 'entry', id: e.id });
+  }, [app, dialogs]);
+
+  const toggleReference = useCallback(() => {
+    if (app.panels.right === 'reference' && !app.panels.pinnedReference) app.setPanels({ right: null });
+    else app.setPanels({ right: 'reference' });
+  }, [app]);
+
+  const setAuthor = useCallback(async () => {
+    const st = await api.appState();
+    const name = await dialogs.prompt({ title: 'Your name', label: 'Every block you write is signed with this name (spec: authorship is recorded from day one).', initial: st.author, okLabel: 'Save' });
+    if (name) {
+      await api.setAuthor(name);
+      app.notify(`Signing new blocks as ${name}`);
+    }
+  }, [app, dialogs]);
+
+  const cycleTheme = useCallback(() => {
+    const next: Theme = theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system';
+    applyTheme(next);
+    setTheme(next);
+  }, [theme]);
+
+  const commands: Command[] = useMemo(
+    () => [
+      { id: 'new-entry', label: 'New document', hint: 'Ctrl+N', run: newEntry },
+      { id: 'new-entity', label: 'New entity', hint: 'Ctrl+Shift+E', run: () => newEntity() },
+      { id: 'search', label: 'Search all writing', hint: 'Ctrl+Shift+F', run: () => app.openTab({ kind: 'search', query: '' }) },
+      { id: 'goto', label: 'Go to entry or entity', hint: 'Ctrl+O', run: () => setTimeout(() => setPalette('switch'), 0) },
+      { id: 'ref', label: 'Toggle markup quick reference', hint: 'F1', run: toggleReference },
+      { id: 'context', label: 'Toggle “This block” panel', hint: 'Ctrl+\\', run: () => app.setPanels({ right: app.panels.right ? null : 'context' }) },
+      { id: 'raw', label: app.rawMarkup ? 'Show chips (hide raw markup)' : 'Show raw markup', hint: 'Ctrl+E', run: () => app.setRawMarkup(!app.rawMarkup) },
+      { id: 'close-tab', label: 'Close tab', hint: 'Ctrl+W', run: () => app.active && app.closeTab(app.active) },
+      { id: 'theme', label: `Theme: ${theme} → ${theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system'}`, run: cycleTheme },
+      { id: 'author', label: 'Set your name (block signatures)', run: setAuthor },
+      {
+        id: 'rebuild',
+        label: 'Rebuild index',
+        run: async () => {
+          const r = await api.rebuildIndex();
+          app.notify(`Index rebuilt: ${r.blocks.toLocaleString()} blocks in ${r.ms} ms`);
+          await app.refreshNames();
+        },
+      },
+      { id: 'reveal', label: 'Show vault folder on disk', run: async () => app.notify(`Vault folder: ${await api.revealInFolder()}`) },
+      { id: 'switch', label: 'Switch project…', run: onCloseVault },
+    ],
+    [app, newEntity, newEntry, toggleReference, theme, cycleTheme, setAuthor, onCloseVault],
+  );
+
+  useEffect(() => {
+    const onCommand = (e: Event) => {
+      const d = (e as CustomEvent).detail as { id: string; name?: string };
+      if (d.id === 'new-entity') newEntity(d.name);
+    };
+    window.addEventListener('lr:command', onCommand);
+    return () => window.removeEventListener('lr:command', onCommand);
+  }, [newEntity]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const mod = e.ctrlKey || e.metaKey;
+      const k = e.key.toLowerCase();
+      if (document.querySelector('.modal-backdrop')) return;
+      let handled = true;
+      if (e.key === 'F1') toggleReference();
+      else if (mod && !e.shiftKey && k === 'o') setPalette('switch');
+      else if (mod && (k === 'k' || (e.shiftKey && k === 'p'))) setPalette('command');
+      else if (mod && !e.shiftKey && k === 'n') newEntry();
+      else if (mod && e.shiftKey && k === 'e') newEntity();
+      else if (mod && e.shiftKey && k === 'f') app.openTab({ kind: 'search', query: '' });
+      else if (mod && !e.shiftKey && k === 'e') app.setRawMarkup(!app.rawMarkup);
+      else if (mod && e.key === '\\') app.setPanels({ right: app.panels.right ? null : 'context' });
+      else if (mod && k === 'w') {
+        if (app.active) app.closeTab(app.active);
+      } else if (mod && e.key === 'Tab') {
+        const i = app.tabs.findIndex((t) => t.key === app.active);
+        const n = app.tabs.length;
+        if (n) app.setActive(app.tabs[(i + (e.shiftKey ? n - 1 : 1)) % n].key);
+      } else handled = false;
+      if (handled) e.preventDefault();
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [app, newEntry, newEntity, toggleReference]);
+
+  const tabTitle = (t: Tab) => {
+    if (t.kind === 'entity') return app.entityById.get(t.id)?.name ?? '…';
+    if (t.kind === 'search') return 'Search';
+    return null;
+  };
+
+  return (
+    <div className={`workspace ${app.panels.right ? 'with-right' : ''}`}>
+      <Sidebar onSwitchVault={onCloseVault} />
+      <div className="center">
+        <div className="tabbar" role="tablist">
+          {app.tabs.map((t) => (
+            <div
+              key={t.key}
+              role="tab"
+              aria-selected={t.key === app.active}
+              className={`tab ${t.key === app.active ? 'active' : ''} tab-${t.kind}`}
+              onClick={() => app.setActive(t.key)}
+              onMouseDown={(e) => {
+                if (e.button === 1) {
+                  e.preventDefault();
+                  app.closeTab(t.key);
+                }
+              }}
+            >
+              {t.kind === 'entity' && <span className="dot" style={{ background: app.entityById.get(t.id)?.color }} />}
+              <span className="tab-title">{tabTitle(t) ?? <EntryTitle id={(t as { id: string }).id} />}</span>
+              <button
+                className="tab-close"
+                aria-label="Close tab"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  app.closeTab(t.key);
+                }}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          <span className="spacer" />
+          <button className="tab-action" onClick={() => setPalette('switch')} title="Go to (Ctrl+O)">
+            Go to… <kbd>Ctrl+O</kbd>
+          </button>
+        </div>
+        <div className="doc-area">
+          {activeTab?.kind === 'entry' && <EntryView key={activeTab.key} id={activeTab.id} focusBlock={activeTab.focusBlock} />}
+          {activeTab?.kind === 'entity' && <ProfileView key={activeTab.key} id={activeTab.id} focusBlock={activeTab.focusBlock} />}
+          {activeTab?.kind === 'search' && <SearchView query={activeTab.query} />}
+          {!activeTab && <Welcome onNewEntry={newEntry} onNewEntity={() => newEntity()} onGoto={() => setPalette('switch')} />}
+        </div>
+      </div>
+      <RightPanel />
+      <StatusBar onAuthor={setAuthor} theme={theme} onTheme={cycleTheme} />
+      {palette && <Palette mode={palette} commands={commands} onClose={() => setPalette(null)} />}
+      <div className="toasts" aria-live="polite">
+        {app.toasts.map((t) => (
+          <div key={t.id} className={`toast toast-${t.kind}`}>
+            {t.msg}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function EntryTitle({ id }: { id: string }) {
+  const app = useApp();
+  const [title, setTitle] = useState('…');
+  useEffect(() => {
+    api
+      .getEntry(id)
+      .then((e) => setTitle(e.title))
+      .catch(() => setTitle('(missing)'));
+  }, [id, app.version]);
+  return <>{title}</>;
+}
+
+function Welcome({ onNewEntry, onNewEntity, onGoto }: { onNewEntry: () => void; onNewEntity: () => void; onGoto: () => void }) {
+  const app = useApp();
+  const c = app.info.counts;
+  return (
+    <div className="welcome">
+      <h1>{app.info.settings.name}</h1>
+      <p className="muted">
+        {c.entries} entr{c.entries === 1 ? 'y' : 'ies'} · {c.entities} entit{c.entities === 1 ? 'y' : 'ies'} · {c.blocks} block{c.blocks === 1 ? '' : 's'}
+      </p>
+      <div className="welcome-actions">
+        <button className="welcome-card" onClick={onNewEntry}>
+          <strong>Write</strong>
+          <span>Start a new entry. Tag people, places and topics as you go with @.</span>
+          <kbd>Ctrl+N</kbd>
+        </button>
+        <button className="welcome-card" onClick={onNewEntity}>
+          <strong>Create a profile</strong>
+          <span>A person, work, place or topic. Profiles fill themselves from your writing.</span>
+          <kbd>Ctrl+Shift+E</kbd>
+        </button>
+        <button className="welcome-card" onClick={onGoto}>
+          <strong>Find</strong>
+          <span>Jump to anything by name or alias, or search every paragraph.</span>
+          <kbd>Ctrl+O</kbd>
+        </button>
+      </div>
+      <div className="welcome-howto">
+        <h2>How it works</h2>
+        <ol>
+          <li>
+            Write naturally. Type <code>@</code> and a name to tag a paragraph — <code>@@</code> creates someone new.
+          </li>
+          <li>
+            A heading like <code>## Apple Scouch @</code> files every paragraph beneath it to that person.
+          </li>
+          <li>The coloured stripe in the margin shows where each paragraph will appear.</li>
+          <li>Open any profile: it is assembled live from those paragraphs. Edit one there and it changes everywhere.</li>
+        </ol>
+      </div>
+    </div>
+  );
+}
+
+function StatusBar({ onAuthor, theme, onTheme }: { onAuthor: () => void; theme: Theme; onTheme: () => void }) {
+  const app = useApp();
+  const c = app.info.counts;
+  const saveLabel = { saved: 'Saved', saving: 'Saving…', unsaved: 'Editing…', error: 'Save failed' }[app.saveState];
+  return (
+    <footer className="statusbar">
+      <span className={`save-state save-${app.saveState}`}>{saveLabel}</span>
+      <span>
+        {c.entries} entries · {c.entities} entities · {c.blocks.toLocaleString()} blocks
+      </span>
+      <span className="spacer" />
+      <button className={`status-btn ${app.rawMarkup ? 'on' : ''}`} onClick={() => app.setRawMarkup(!app.rawMarkup)} title="Ctrl+E">
+        {app.rawMarkup ? 'Raw markup' : 'Chips'}
+      </button>
+      <button className="status-btn" onClick={() => app.setPanels({ right: app.panels.right === 'reference' ? null : 'reference' })} title="F1">
+        Markup help
+      </button>
+      <button className="status-btn" onClick={onTheme} title="Theme">
+        {theme === 'dark' ? '☾' : theme === 'light' ? '☀' : '◐'}
+      </button>
+      <button className="status-btn" onClick={onAuthor} title="Your name signs every block you write">
+        ✍ author
+      </button>
+      <span className="muted path" title={app.info.root}>
+        {app.info.root}
+      </span>
+    </footer>
+  );
+}

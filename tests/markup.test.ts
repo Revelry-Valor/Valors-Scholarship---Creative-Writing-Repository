@@ -96,6 +96,12 @@ describe('document blocks', () => {
     expect(ids.every(Boolean)).toBe(true);
   });
 
+  it('keeps the first id when two paragraphs are merged', () => {
+    const body = 'first half ^b-aaaaaa\nsecond half ^b-bbbbbb\n';
+    const out = applyEdits(body, planBlockIds(body));
+    expect(out).toBe('first half\nsecond half ^b-aaaaaa\n');
+  });
+
   it('joins blocks back', () => {
     expect(joinBlocks([{ text: 'a', id: 'b-1', kind: 'paragraph' }, { text: '- x', kind: 'list' }, { text: '- y', kind: 'list' }])).toBe('a ^b-1\n\n- x\n- y\n');
   });

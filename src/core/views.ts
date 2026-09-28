@@ -208,7 +208,7 @@ export function buildProfile(v: Vault, entityId: string): ProfileView {
     if (b.eventDate?.sort === undefined) continue;
     if (timeline.some((t) => t.blockId === b.id)) continue;
     const txt = plainText(b.text, v.names);
-    timeline.push({ sort: b.eventDate.sort, label: b.eventDate.text, text: txt.length > 90 ? `${txt.slice(0, 88)}…` : txt, blockId: b.id });
+    timeline.push({ sort: b.eventDate.sort, label: '', text: txt.length > 90 ? `${txt.slice(0, 88)}…` : txt, blockId: b.id });
   }
   timeline.sort((a, b) => a.sort - b.sort);
 

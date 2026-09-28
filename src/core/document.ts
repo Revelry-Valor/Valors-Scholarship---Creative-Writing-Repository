@@ -190,11 +190,15 @@ export function newId(prefix: 'b' | 'e' | 'n', length = 6): string {
   return `${prefix}-${s}`;
 }
 
+const INNER_ID_RE = /[ \t]\^(b-[a-z0-9]+)[ \t]*(?=\n)/g;
+
 /**
  * Give every block without an id a new one, and replace ids that are duplicated
  * inside the body (e.g. after copy-paste) or already `taken` elsewhere.
- * Returns the edits as offset insertions/replacements so an editor can apply
- * them without disturbing the cursor.
+ * When two paragraphs were merged, the merged block keeps the first one's id and
+ * the stray inner id is removed.
+ * Returns the edits as offset replacements so an editor can apply them without
+ * disturbing the cursor.
  */
 export function planBlockIds(
   body: string,
@@ -204,19 +208,20 @@ export function planBlockIds(
   const seen = new Set<string>();
   for (const b of splitBlocks(body)) {
     if (b.kind === 'code' && !b.text.trim()) continue;
-    if (b.id && !seen.has(b.id) && !taken(b.id)) {
-      seen.add(b.id);
+    const inner = b.kind === 'code' ? [] : [...b.text.matchAll(INNER_ID_RE)];
+    for (const m of inner) edits.push({ from: b.from + m.index!, to: b.from + m.index! + m[0].length, insert: '', id: '' });
+    const idFrom = b.from + b.text.length;
+    const setId = (id: string) => edits.push({ from: idFrom, to: b.to, insert: ` ^${id}`, id });
+    const want = inner.length ? inner[0][1] : b.id;
+    if (want && !seen.has(want) && !taken(want)) {
+      seen.add(want);
+      if (want !== b.id) setId(want);
       continue;
     }
     let id = newId('b');
     while (seen.has(id) || taken(id)) id = newId('b');
     seen.add(id);
-    if (b.id) {
-      const idAt = body.lastIndexOf(`^${b.id}`, b.to);
-      edits.push({ from: idAt + 1, to: idAt + 1 + b.id.length, insert: id, id });
-    } else {
-      edits.push({ from: b.to, to: b.to, insert: ` ^${id}`, id });
-    }
+    setId(id);
   }
   return edits;
 }

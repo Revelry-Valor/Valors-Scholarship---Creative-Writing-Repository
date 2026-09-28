@@ -207,7 +207,6 @@ function analyzeOne(b: BlockInput, stack: StackEntry[], ctx: AnalysisContext): A
       entityRef,
       blockId,
     });
-    if (isDate && !eventDate && parsed) eventDate = { text: t.value, sort: parsed.sort };
   }
 
   // Relationships: @A >relation> @B
