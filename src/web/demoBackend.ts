@@ -302,6 +302,52 @@ async function addScholarshipLibrary() {
   }
 }
 
+/** A sample map for the fantasy world: drawn on parchment, with pins, regions and a route. */
+async function addWorldMap() {
+  try {
+    if (localStorage.getItem('lr.demo.map.v1')) return;
+  } catch {
+    return;
+  }
+  const v = await Vault.open(WORLD, { author: 'you' });
+  const id = (name: string) => [...v.entities.values()].find((e) => e.name === name)?.id;
+  const dates: Array<[string, Record<string, number>]> = [
+    ['Varenhold', { founded: 612 }],
+    ['Carrow', { founded: 700, fell: 890 }],
+    ['Iron Coast', { founded: 820 }],
+    ['Carrow Keep', { founded: 705, fell: 890 }],
+    ['Saltmere', { founded: 640 }],
+  ];
+  for (const [name, fields] of dates) {
+    const e = id(name);
+    const ent = e ? v.entities.get(e) : undefined;
+    if (ent && !Object.keys(ent.fields ?? {}).some((k) => k in fields)) await v.updateEntity(e!, { fields: { ...ent.fields, ...fields } });
+  }
+  if (!(await v.listViews()).some((x) => x.kind === 'map')) {
+    const view = await v.createView({ name: 'Map of the realm', kind: 'map' });
+    const region = (name: string, pts: Array<[number, number]>) => ({ id: name.toLowerCase().replace(/\W+/g, '-'), entity: id(name), points: pts });
+    await v.saveView({
+      ...view,
+      year: 850,
+      regions: [
+        region('Varenhold', [[0.08, 0.12], [0.42, 0.08], [0.47, 0.42], [0.3, 0.55], [0.1, 0.46]]),
+        region('Carrow', [[0.47, 0.42], [0.72, 0.36], [0.78, 0.66], [0.52, 0.74], [0.3, 0.55]]),
+        region('Iron Coast', [[0.72, 0.36], [0.93, 0.2], [0.95, 0.62], [0.78, 0.66]]),
+      ],
+      markers: [
+        { id: 'carrow-keep', x: 0.62, y: 0.64, entity: id('Carrow Keep') },
+        { id: 'saltmere', x: 0.2, y: 0.22, entity: id('Saltmere') },
+      ],
+      routes: [{ id: 'kings-road', label: "The King's Road", points: [[0.2, 0.22], [0.36, 0.5], [0.62, 0.64], [0.86, 0.5]] }],
+    });
+  }
+  try {
+    localStorage.setItem('lr.demo.map.v1', '1');
+  } catch {
+    // ignore
+  }
+}
+
 async function addScholarshipViews() {
   const v = await Vault.open(VAULT, { author: 'you' });
   const have = await v.listViews();
@@ -339,6 +385,7 @@ const ready = (async () => {
       // ignore: the demo still works without the second sample
     }
   }
+  if (Vault.isVault(WORLD)) await addWorldMap().catch(() => undefined);
   if (Vault.isVault(WORLD) && !backend.config.recent.some((r) => r.path === WORLD)) {
     backend.config.recent.push({ path: WORLD, name: 'The Old Empire', openedAt: new Date().toISOString() });
   }

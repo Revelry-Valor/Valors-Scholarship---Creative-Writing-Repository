@@ -11,7 +11,7 @@ type Dialogs = ReturnType<typeof useDialogs>;
 
 export async function newView(app: App, dialogs: Dialogs) {
   const kind = await dialogs.pick<ViewKind>({
-    title: 'New timeline, tree, table or parallel view',
+    title: 'New map, timeline, tree, table or parallel view',
     items: VIEW_KINDS.map((k) => ({ label: `${k.icon}  ${k.label}`, detail: k.blurb, value: k.id })),
   });
   if (!kind) return;
@@ -72,7 +72,7 @@ export function ViewsSection() {
   return (
     <div className="side-section views-section">
       <div className="side-head">
-        <span>Timelines, Trees &amp; Tables</span>
+        <span>Maps, Timelines &amp; Tables</span>
         <button className="icon-btn" title="New timeline, tree, table or parallel view" onClick={() => newView(app, dialogs)}>
           +
         </button>

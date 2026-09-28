@@ -11,7 +11,7 @@ type App = ReturnType<typeof useApp>;
 type Dialogs = ReturnType<typeof useDialogs>;
 type Column = NonNullable<ViewDef['columns']>[number];
 
-function ViewHead({ def, setDef, update, icon, label, children }: { def: ViewDef; setDef: (d: ViewDef) => void; update: (p: Partial<ViewDef>) => void; icon: string; label: string; children?: React.ReactNode }) {
+export function ViewHead({ def, setDef, update, icon, label, children }: { def: ViewDef; setDef: (d: ViewDef) => void; update: (p: Partial<ViewDef>) => void; icon: string; label: string; children?: React.ReactNode }) {
   const app = useApp();
   const dialogs = useDialogs();
   return (

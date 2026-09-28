@@ -16,6 +16,7 @@ import type { TriggerTheme } from '../core/triggers';
 import { lookup, quoteFor, type LookupQuery, type LookupResult } from '../core/lookup';
 import type { SavedLookup } from '../core/vault';
 import { entityTable, parallelView, type EvidenceStance } from '../core/compare';
+import { entitySpans, snapshot } from '../core/maps';
 
 export interface RecentVault {
   path: string;
@@ -228,6 +229,10 @@ export class Backend {
     entityTable: async (def: Pick<ViewDef, 'types' | 'fields'>) => entityTable(this.v(), def),
     parallel: async (def: Pick<ViewDef, 'columns' | 'align'>) => parallelView(this.v(), def),
     contradictions: async () => this.v().contradictions(),
+    entitySpans: async () => entitySpans(this.v()),
+    snapshot: async (year: number, window?: number) => snapshot(this.v(), year, window),
+    getMapImage: async (viewId: string) => this.v().getMapImage(viewId),
+    saveMapImage: async (viewId: string, dataUrl: string) => this.v().saveMapImage(viewId, dataUrl),
     listLexicons: async () => this.v().listLexicons(),
     importLexicon: async (opts: { name: string; text: string }) => this.v().importLexicon(opts),
     deleteLexicon: async (id: string) => this.v().deleteLexicon(id),

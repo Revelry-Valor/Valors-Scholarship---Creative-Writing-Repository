@@ -25,6 +25,7 @@ export const WORLD_TEMPLATES: TemplateDef[] = [
       f('size', 'Size (hamlet, village, town, city)'),
       f('population', 'Population', 'number'),
       f('founded', 'Founded', 'date'),
+      f('fell', 'Fell / abandoned', 'date'),
       f('ruler', 'Ruler', 'entity'),
       f('nation', 'Nation', 'entity', { entityType: 'faction' }),
       f('trade', 'Trade goods', 'list', { of: 'text' }),
@@ -257,7 +258,7 @@ const scholarshipTemplates: TemplateDef[] = [
     name: 'Movement / Group',
     folder: 'groups',
     color: '#a0508f',
-    fields: [f('founded', 'Founded', 'date'), f('founder', 'Founder', 'entity', { entityType: 'person' }), f('active_period', 'Active period')],
+    fields: [f('founded', 'Founded', 'date'), f('ended', 'Ended', 'date'), f('founder', 'Founder', 'entity', { entityType: 'person' }), f('active_period', 'Active period')],
     sections: ['Beliefs', 'Members', 'Opponents'],
   },
   {
@@ -299,6 +300,7 @@ const fantasyTemplates: TemplateDef[] = [
       f('ruler', 'Ruler', 'entity'),
       f('population', 'Population', 'number'),
       f('founded', 'Founded', 'date'),
+      f('fell', 'Fell / abandoned', 'date'),
     ],
     sections: ['History', 'Geography', 'Inhabitants', 'Events here'],
   },
@@ -309,6 +311,7 @@ const fantasyTemplates: TemplateDef[] = [
     color: '#b23a48',
     fields: [
       f('founded', 'Founded', 'date'),
+      f('fell', 'Fell / dissolved', 'date'),
       f('leader', 'Leader', 'entity'),
       f('capital', 'Capital', 'entity', { entityType: 'place' }),
       f('allies', 'Allies', 'list', { of: 'entity', inverse: 'allies' }),

@@ -200,7 +200,7 @@ export interface DocFormat {
   width?: 'narrow' | 'normal' | 'wide';
 }
 
-export type ViewKind = 'timeline' | 'family' | 'lineage' | 'tech' | 'radial' | 'web' | 'parallel' | 'table';
+export type ViewKind = 'timeline' | 'family' | 'lineage' | 'tech' | 'radial' | 'web' | 'parallel' | 'table' | 'map';
 
 /** A saved timeline or chart (views/<id>.yaml). It stores settings, never content. */
 export interface ViewDef {
@@ -227,6 +227,13 @@ export interface ViewDef {
   fields?: string[];
   sortBy?: string;
   sortDesc?: boolean;
+  /** Maps: the image has been set (stored in maps/<id>.txt); size in pixels. */
+  image?: { width: number; height: number } | null;
+  markers?: Array<{ id: string; x: number; y: number; entity?: string; label?: string; from?: number; to?: number }>;
+  regions?: Array<{ id: string; points: Array<[number, number]>; entity?: string; label?: string; color?: string; from?: number; to?: number }>;
+  routes?: Array<{ id: string; points: Array<[number, number]>; entity?: string; label?: string; color?: string; from?: number; to?: number }>;
+  /** Maps: the year shown (unset = all times). */
+  year?: number;
 }
 
 /** Where a block lives: your writing, an entity's own page, or an imported source. */

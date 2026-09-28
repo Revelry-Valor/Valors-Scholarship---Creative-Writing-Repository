@@ -10,6 +10,7 @@
 //   research.yaml   saved research lookups
 //   claims.yaml     evidence attached to paragraphs marked !claim
 //   lexicons/       imported word lists (Greek, Hebrew…) as TSV
+//   maps/           map images (as data URLs) for map views
 //   .meta/          block authorship and history (keep)
 //   .index/         generated, safe to delete
 //
@@ -1295,6 +1296,7 @@ export class Vault {
   deleteView(id: string) {
     return this.exclusive(async () => {
       await this.toTrash(`views/${id}.yaml`);
+      if (existsSync(this.abs(`maps/${id}.txt`))) await this.toTrash(`maps/${id}.txt`);
       this.emit({ files: [`views/${id}.yaml`], entities: false, binder: true });
     });
   }
@@ -1468,6 +1470,20 @@ export class Vault {
       const list = (await this.listLookups()).filter((x) => x.name !== name);
       await this.writeRel('research.yaml', YAML.stringify({ lookups: list }));
       return list;
+    });
+  }
+
+  /** A map view's image, stored as a data URL so it travels with the project's text files. */
+  async getMapImage(viewId: string): Promise<string | null> {
+    return fs.readFile(this.abs(`maps/${viewId}.txt`), 'utf8').catch(() => null);
+  }
+
+  saveMapImage(viewId: string, dataUrl: string) {
+    return this.exclusive(async () => {
+      if (!/^data:image\/(png|jpe?g|webp|gif|svg\+xml);base64,/.test(dataUrl)) throw new Error('That is not an image (PNG, JPEG, WebP, GIF or SVG).');
+      await fs.mkdir(this.abs('maps'), { recursive: true });
+      await this.writeRel(`maps/${viewId}.txt`, dataUrl);
+      return true;
     });
   }
 

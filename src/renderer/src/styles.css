@@ -4053,3 +4053,200 @@ mark.hit {
   padding-left: 7px;
   padding-right: 7px;
 }
+
+/* ---------- maps */
+.map-tools {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.map-yearbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  flex-wrap: wrap;
+}
+.map-yearbar input[type='range'] {
+  flex: 1;
+  min-width: 160px;
+  max-width: 520px;
+  accent-color: var(--accent);
+}
+.map-year {
+  width: 84px !important;
+}
+.map-hint {
+  color: var(--accent);
+}
+.map-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.map-canvas {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--line-soft);
+  touch-action: none;
+  cursor: grab;
+}
+.map-canvas.tool-pin,
+.map-canvas.tool-region,
+.map-canvas.tool-route {
+  cursor: crosshair;
+}
+.map-content {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  box-shadow: 0 2px 18px rgb(0 0 0 / 18%);
+}
+.map-content img,
+.map-parchment {
+  display: block;
+  width: 100%;
+  height: 100%;
+  user-select: none;
+  pointer-events: none;
+}
+.map-parchment {
+  background:
+    radial-gradient(ellipse at 30% 35%, rgb(255 255 255 / 35%), transparent 60%),
+    radial-gradient(circle, rgb(120 90 50 / 12%) 1px, transparent 1.5px) 0 0 / 40px 40px,
+    #efe2c4;
+}
+.map-content svg {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+.map-region polygon {
+  fill-opacity: 0.18;
+  stroke-opacity: 0.8;
+  cursor: pointer;
+}
+.map-region.sel polygon {
+  fill-opacity: 0.32;
+  stroke-width: 4;
+}
+.map-route polyline {
+  fill: none;
+  cursor: pointer;
+}
+.map-route .route-hit {
+  stroke: transparent;
+}
+.map-route.sel polyline:first-child {
+  filter: drop-shadow(0 0 3px var(--accent));
+}
+.map-marker {
+  cursor: pointer;
+}
+.map-marker circle {
+  stroke: #fff;
+}
+.map-marker.sel circle {
+  stroke: var(--ink);
+}
+.map-label {
+  font-family: var(--serif);
+  font-weight: 600;
+  fill: #2a251f;
+  paint-order: stroke;
+  stroke: rgb(255 253 248 / 85%);
+  stroke-width: 3px;
+  pointer-events: none;
+}
+.region-label {
+  text-anchor: middle;
+  font-variant: small-caps;
+  letter-spacing: 0.08em;
+}
+.map-draft polyline {
+  fill: none;
+  stroke: var(--accent);
+  stroke-dasharray: 4 3;
+}
+.map-draft circle {
+  fill: var(--accent);
+}
+.map-empty {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 380px;
+  text-align: center;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px 20px;
+  box-shadow: var(--shadow);
+}
+.map-side {
+  width: 300px;
+  flex: none;
+  border-left: 1px solid var(--line);
+  background: var(--panel);
+  overflow: auto;
+  padding: 12px 14px;
+}
+.map-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.map-item h3,
+.snapshot h3 {
+  margin: 0;
+  font: 600 16px var(--serif);
+}
+.map-years {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.snapshot h4 {
+  font: 600 11px var(--sans);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin: 14px 0 4px;
+}
+.snap-list,
+.snap-events {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 13.5px;
+}
+.snap-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+}
+.snap-events .linkish {
+  text-align: left;
+  font: 13.5px/1.45 var(--serif);
+}
+@media (max-width: 900px) {
+  .map-side {
+    display: none;
+  }
+}
+.route-label {
+  font-style: italic;
+  font-weight: 500;
+}
