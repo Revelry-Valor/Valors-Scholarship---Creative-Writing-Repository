@@ -49,6 +49,8 @@ interface AppState {
   setPanels: (p: Partial<AppState['panels']>) => void;
   rawMarkup: boolean;
   setRawMarkup: (v: boolean) => void;
+  focusMode: boolean;
+  setFocusMode: (v: boolean) => void;
   currentBlock: CurrentBlock | null;
   setCurrentBlock: (b: CurrentBlock | null) => void;
   saveState: 'saved' | 'saving' | 'unsaved' | 'error';
@@ -95,6 +97,7 @@ export function AppProvider({ info: initialInfo, children }: { info: VaultInfo; 
     }
   });
   const [rawMarkup, setRawMarkup] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
   const [currentBlock, setCurrentBlock] = useState<CurrentBlock | null>(null);
   const [saveState, setSaveState] = useState<AppState['saveState']>('saved');
   const [toasts, setToasts] = useState<AppState['toasts']>([]);
@@ -209,6 +212,8 @@ export function AppProvider({ info: initialInfo, children }: { info: VaultInfo; 
     setPanels,
     rawMarkup,
     setRawMarkup,
+    focusMode,
+    setFocusMode,
     currentBlock,
     setCurrentBlock,
     saveState,

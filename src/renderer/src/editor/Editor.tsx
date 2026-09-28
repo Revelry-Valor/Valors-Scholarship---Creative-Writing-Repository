@@ -7,11 +7,12 @@ import { Decoration, type DecorationSet } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search';
 import { completionKeymap, closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
-import { markdown } from '@codemirror/lang-markdown';
+import { markdown, markdownLanguage, markdownKeymap } from '@codemirror/lang-markdown';
 import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
 import { tags as t } from '@lezer/highlight';
 import { planBlockIds } from '../../../core/document';
 import { analysisField, envField, openEntityAtCursor, setEnv, writingExtensions, type AnalyzedDocBlock, type EditorEnv } from './extensions';
+import { formattingExtensions, paragraphKeys } from './format';
 import { useApp } from '../state';
 import { api } from '../api';
 
@@ -57,11 +58,17 @@ export interface EditorProps {
   /** Called before saving when blocks that appear on other pages were removed. */
   confirmRemoval?: (removed: Array<{ id: string; pages: number; text: string }>) => Promise<'delete' | 'move' | 'restore'>;
   onReady?: (h: EditorHandle) => void;
+  /** Called after the selection or text changes (drives the formatting toolbar). */
+  onUpdate?: (view: EditorView) => void;
 }
 
 function pagesOf(b: AnalyzedDocBlock) {
   return 1 + b.analysis.filedTo.filter((f) => f.via !== 'direct').length;
 }
+
+// Files end with a newline; the editor doesn't show that empty last line, so
+// clicking below the text never attaches new words to the last paragraph.
+const stripEnd = (s: string) => s.replace(/\n+$/, '');
 
 export function Editor(props: EditorProps) {
   const app = useApp();
@@ -71,7 +78,7 @@ export function Editor(props: EditorProps) {
   propsRef.current = props;
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const saving = useRef<Promise<void> | null>(null);
-  const lastSaved = useRef(props.initial);
+  const lastSaved = useRef(stripEnd(props.initial));
   const savedBlocks = useRef(new Map<string, { pages: number; text: string }>());
   const appRef = useRef(app);
   appRef.current = app;
@@ -160,10 +167,10 @@ export function Editor(props: EditorProps) {
         }
       }
       try {
-        const res = await propsRef.current.onSave(text);
-        lastSaved.current = res?.body ?? text;
+        const res = await propsRef.current.onSave(propsRef.current.mode === 'document' && text ? `${text}\n` : text);
+        lastSaved.current = res ? stripEnd(res.body) : text;
         if (res && res.changed && view.state.doc.toString() === text) {
-          view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: res.body }, annotations: internal.of('reload') });
+          view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: stripEnd(res.body) }, annotations: internal.of('reload') });
         }
         rememberBlocks(view);
         app.setSaveState(view.state.doc.toString() === lastSaved.current ? 'saved' : 'unsaved');
@@ -180,7 +187,7 @@ export function Editor(props: EditorProps) {
   useEffect(() => {
     const isBlock = props.mode === 'block';
     const state = EditorState.create({
-      doc: props.initial,
+      doc: stripEnd(props.initial),
       extensions: [
         history(),
         drawSelection(),
@@ -189,8 +196,9 @@ export function Editor(props: EditorProps) {
         highlightSelectionMatches(),
         isBlock ? [] : highlightActiveLine(),
         closeBrackets(),
-        markdown(),
+        markdown({ base: markdownLanguage, addKeymap: false }),
         syntaxHighlighting(markdownStyle),
+        formattingExtensions(),
         cmPlaceholder(props.placeholder ?? ''),
         flashField,
         writingExtensions({ stripe: !isBlock }),
@@ -210,12 +218,15 @@ export function Editor(props: EditorProps) {
             : []),
           ...closeBracketsKeymap,
           ...completionKeymap,
+          ...(isBlock ? [] : paragraphKeys),
+          ...markdownKeymap,
           ...defaultKeymap,
           ...historyKeymap,
           ...searchKeymap,
           indentWithTab,
         ]),
         EditorView.updateListener.of((u) => {
+          if (u.docChanged || u.selectionSet || u.focusChanged) propsRef.current.onUpdate?.(u.view);
           if (!u.docChanged) return;
           const kind = u.transactions.map((tr) => tr.annotation(internal)).find(Boolean);
           if (kind) return;
@@ -248,7 +259,7 @@ export function Editor(props: EditorProps) {
     props.onReady?.({ view, flush: save });
     return () => {
       clearTimeout(timer.current);
-      if (!isBlock && view.state.doc.toString() !== lastSaved.current) void propsRef.current.onSave(view.state.doc.toString());
+      if (!isBlock && view.state.doc.toString() !== lastSaved.current) void propsRef.current.onSave(`${view.state.doc.toString()}\n`);
       view.destroy();
       viewRef.current = null;
     };
@@ -265,7 +276,7 @@ export function Editor(props: EditorProps) {
   useEffect(() => {
     const view = viewRef.current;
     if (!view || !props.external) return;
-    const body = props.external.body;
+    const body = stripEnd(props.external.body);
     const cur = view.state.doc.toString();
     if (body === cur || body === lastSaved.current) return;
     if (cur !== lastSaved.current) return; // unsaved local edits win; they save next

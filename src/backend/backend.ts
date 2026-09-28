@@ -128,7 +128,7 @@ export class Backend {
     createEntry: async (opts: { title: string; parent?: BinderParent; index?: number }) => this.v().createEntry(opts),
     getEntry: async (id: string) => this.v().getEntry(id),
     saveEntry: async (id: string, body: string) => this.v().saveEntry(id, body),
-    updateEntry: async (id: string, patch: { title?: string; status?: EntryStatus }) => this.v().updateEntry(id, patch),
+    updateEntry: async (id: string, patch: Parameters<Vault['updateEntry']>[1]) => this.v().updateEntry(id, patch),
     deleteEntry: async (id: string) => this.v().deleteEntry(id),
     createFolder: async (opts: { name: string; parent?: BinderParent }) => this.v().createFolder(opts),
     renameFolder: async (p: string, name: string) => this.v().renameFolder(p, name),

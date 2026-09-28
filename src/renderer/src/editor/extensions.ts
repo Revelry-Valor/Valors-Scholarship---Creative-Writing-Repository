@@ -332,17 +332,23 @@ const protectIds = EditorState.transactionFilter.of((tr) => {
     let to = toA;
     const text = inserted.toString();
     for (const b of ids) {
+      if (from < b.idTo && to > b.idFrom && !(from <= b.from && to >= b.idTo)) {
+        if (from >= b.idFrom) {
+          // Deleting only the hidden id: delete the neighbouring visible character instead.
+          if (backward && b.idFrom > b.from && !text) [from, to] = [b.idFrom - 1, b.idFrom];
+          else if (forward && !text) [from, to] = [b.idTo, Math.min(b.idTo + 1, tr.startState.doc.length)];
+          else [from, to] = [b.idFrom, b.idFrom];
+        } else to = b.idFrom;
+        changed = true;
+        cursor = from;
+      }
       if (from === to && from === b.idTo && text && !text.startsWith('\n')) {
         from = to = b.idFrom;
         changed = true;
         cursor = from;
-      } else if (from < b.idTo && to > b.idFrom && !(from <= b.from && to >= b.idTo)) {
-        if (from >= b.idFrom) {
-          // Deleting only the hidden id: delete the neighbouring visible character instead.
-          if (backward && b.idFrom > b.from) [from, to] = [b.idFrom - 1, b.idFrom];
-          else if (forward) [from, to] = [b.idTo, Math.min(b.idTo + 1, tr.startState.doc.length)];
-          else [from, to] = [b.idFrom, b.idFrom];
-        } else to = b.idFrom;
+      } else if (from === to && from === b.idFrom && text.startsWith('\n')) {
+        // Enter at the end of a paragraph: the id stays with the paragraph, not the new line.
+        from = to = b.idTo;
         changed = true;
         cursor = from;
       }
@@ -518,20 +524,23 @@ function atCompletions(context: CompletionContext): CompletionResult | null {
   const typed = raw.replace(/^[@-]/, '').replace(/^\[/, '');
   const to = context.pos;
   if (!typed && !context.explicit && !m.text.endsWith('@')) return null;
-  // Names can have spaces, but stop offering once the words stop matching a name —
-  // otherwise the menu would reopen on ordinary prose after a finished tag.
+  // Names can have spaces ("Jone Doe", "Council of Nicaea"). Keep the menu open while the
+  // words could still be a name, but close it once a known name is finished and the
+  // writer has moved on to ordinary prose ("@Scouch went home").
   if (/\s/.test(typed)) {
-    if (create) {
-      const words = typed.split(/\s+/);
-      const last = words[words.length - 1];
-      if (last && !/^\p{Lu}/u.test(last) && !['of', 'the', 'de', 'von', 'van', 'da', 'di', 'al', 'ibn', 'bin'].includes(last)) return null;
-    } else {
-      const lower = typed.toLowerCase();
-      const continues = [...env.entities.values()].some((e) => [e.name, ...e.aliases].some((n) => n.toLowerCase().startsWith(lower)));
-      if (!continues) return null;
+    const lower = typed.toLowerCase();
+    const continuesKnown = !create && [...env.entities.values()].some((e) => [e.name, ...e.aliases].some((n) => n.toLowerCase().startsWith(lower)));
+    if (!continuesKnown) {
+      const words = typed.trim().split(/\s+/);
+      if (!create) {
+        for (let k = 1; k <= words.length; k++) {
+          if (k === words.length && !/\s$/.test(typed)) break;
+          if (env.ctx.resolver.resolve(words.slice(0, k).join(' ')).status === 'ok') return null;
+        }
+      }
+      if (words.length > 4 || typed.length > 48) return null;
     }
   }
-
   const options: Completion[] = [];
   if (!typed && !create && !optOut) {
     // The bare `@` menu: every marker in one place.

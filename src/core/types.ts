@@ -175,3 +175,13 @@ export interface EntityChip {
   aliases: string[];
   color: string;
 }
+
+/** How a document looks on the page. Stored in the entry's frontmatter as `format:`. */
+export interface DocFormat {
+  font?: string;
+  size?: number;
+  lineHeight?: number;
+  paragraphs?: 'spaced' | 'indented';
+  align?: 'left' | 'justify';
+  width?: 'narrow' | 'normal' | 'wide';
+}

@@ -10,6 +10,7 @@ import { RightPanel } from './Panels';
 import { Palette, type Command } from './Palette';
 import { useDialogs } from './Dialogs';
 import { applyTheme, currentTheme, type Theme } from '../theme';
+import { ContextMenu, type MenuSpec } from './Menu';
 
 export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
   const app = useApp();
@@ -17,6 +18,7 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
   const [palette, setPalette] = useState<'switch' | 'command' | null>(null);
   const [theme, setTheme] = useState<Theme>(currentTheme());
   const [navOpen, setNavOpen] = useState(false);
+  const [cmdMenu, setCmdMenu] = useState<MenuSpec>(null);
   useEffect(() => setNavOpen(false), [app.active]);
 
   const activeTab = app.tabs.find((t) => t.key === app.active) ?? null;
@@ -76,6 +78,7 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
       { id: 'goto', label: 'Go to entry or entity', hint: 'Ctrl+O', run: () => setTimeout(() => setPalette('switch'), 0) },
       { id: 'ref', label: 'Toggle markup quick reference', hint: 'F1', run: toggleReference },
       { id: 'context', label: 'Toggle “This block” panel', hint: 'Ctrl+\\', run: () => app.setPanels({ right: app.panels.right ? null : 'context' }) },
+      { id: 'focus', label: app.focusMode ? 'Leave focus mode' : 'Focus mode (hide panels)', hint: 'Ctrl+Shift+Enter', run: () => app.setFocusMode(!app.focusMode) },
       { id: 'raw', label: app.rawMarkup ? 'Show chips (hide raw markup)' : 'Show raw markup', hint: 'Ctrl+E', run: () => app.setRawMarkup(!app.rawMarkup) },
       { id: 'close-tab', label: 'Close tab', hint: 'Ctrl+W', run: () => app.active && app.closeTab(app.active) },
       { id: 'theme', label: `Theme: ${theme} → ${theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system'}`, run: cycleTheme },
@@ -137,6 +140,8 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
       else if (mod && e.shiftKey && k === 'f') app.openTab({ kind: 'search', query: '' });
       else if (mod && !e.shiftKey && k === 'e') app.setRawMarkup(!app.rawMarkup);
       else if (mod && e.key === '\\') app.setPanels({ right: app.panels.right ? null : 'context' });
+      else if (mod && e.shiftKey && e.key === 'Enter') app.setFocusMode(!app.focusMode);
+      else if (e.key === 'Escape' && app.focusMode && !document.querySelector('.cm-tooltip-autocomplete')) app.setFocusMode(false);
       else if (mod && k === 'w') {
         if (app.active) app.closeTab(app.active);
       } else if (mod && e.key === 'Tab') {
@@ -157,7 +162,7 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
   };
 
   return (
-    <div className={`workspace ${app.panels.right ? 'with-right' : ''} ${navOpen ? 'nav-open' : ''}`}>
+    <div className={`workspace ${app.panels.right && !app.focusMode ? 'with-right' : ''} ${navOpen ? 'nav-open' : ''} ${app.focusMode ? 'focus-mode' : ''}`}>
       <Sidebar onSwitchVault={onCloseVault} />
       {navOpen && <div className="nav-scrim" onClick={() => setNavOpen(false)} />}
       <div className="center">
@@ -194,9 +199,31 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
             </div>
           ))}
           <span className="spacer" />
-          <button className="tab-action" onClick={() => setPalette('switch')} title="Go to (Ctrl+O)">
-            Go to… <kbd>Ctrl+O</kbd>
-          </button>
+          <div className="topbar-actions">
+            <button className="top-btn" onClick={() => setPalette('switch')} title="Jump to any entry or entity (Ctrl+O)">
+              ⌕ Go to… <kbd>Ctrl+O</kbd>
+            </button>
+            <button
+              className={`top-btn ${cmdMenu ? 'on' : ''}`}
+              title="Every command, with its keyboard shortcut"
+              onClick={(e) => {
+                const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                setCmdMenu({ x: r.right - 300, y: r.bottom + 4, items: commands.map((c) => ({ label: c.label, hint: c.hint, run: c.run })) });
+              }}
+            >
+              ☰ Commands ▾
+            </button>
+            <button
+              className={`top-btn ${app.panels.right === 'reference' ? 'on' : ''}`}
+              title="Markup and keyboard reference (F1)"
+              onClick={() => app.setPanels({ right: app.panels.right === 'reference' ? null : 'reference' })}
+            >
+              ? Guide
+            </button>
+            <button className={`top-btn ${app.panels.right === 'context' ? 'on' : ''}`} title="Where the paragraph at the cursor is filed (Ctrl+\\)" onClick={() => app.setPanels({ right: app.panels.right === 'context' ? null : 'context' })}>
+              ◧ Block
+            </button>
+          </div>
         </div>
         <div className="doc-area">
           {activeTab?.kind === 'entry' && <EntryView key={activeTab.key} id={activeTab.id} focusBlock={activeTab.focusBlock} />}
@@ -208,6 +235,7 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
       <RightPanel />
       <StatusBar onAuthor={setAuthor} theme={theme} onTheme={cycleTheme} />
       {palette && <Palette mode={palette} commands={commands} onClose={() => setPalette(null)} />}
+      <ContextMenu spec={cmdMenu} onClose={() => setCmdMenu(null)} />
       <div className="toasts" aria-live="polite">
         {app.toasts.map((t) => (
           <div key={t.id} className={`toast toast-${t.kind}`}>

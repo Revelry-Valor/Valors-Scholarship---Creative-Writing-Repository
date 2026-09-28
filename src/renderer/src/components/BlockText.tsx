@@ -6,7 +6,7 @@ import { useApp } from '../state';
 function inlineMarkdown(text: string, keyBase: string): ReactNode[] {
   // **bold**, *italic*, `code` — enough for reading views.
   const out: ReactNode[] = [];
-  const re = /(\*\*[^*\n]+\*\*|\*[^*\n]+\*|_[^_\n]+_|`[^`\n]+`)/g;
+  const re = /(\*\*[^*\n]+\*\*|\*[^*\n]+\*|_[^_\n]+_|`[^`\n]+`|~~[^~\n]+~~|==[^=\n]+==|<u>.*?<\/u>)/g;
   let last = 0;
   let i = 0;
   for (let m; (m = re.exec(text)); ) {
@@ -15,6 +15,9 @@ function inlineMarkdown(text: string, keyBase: string): ReactNode[] {
     const k = `${keyBase}-${i++}`;
     if (s.startsWith('**')) out.push(<strong key={k}>{s.slice(2, -2)}</strong>);
     else if (s.startsWith('`')) out.push(<code key={k}>{s.slice(1, -1)}</code>);
+    else if (s.startsWith('~~')) out.push(<s key={k}>{s.slice(2, -2)}</s>);
+    else if (s.startsWith('==')) out.push(<mark key={k}>{s.slice(2, -2)}</mark>);
+    else if (s.startsWith('<u>')) out.push(<u key={k}>{s.slice(3, -4)}</u>);
     else out.push(<em key={k}>{s.slice(1, -1)}</em>);
     last = m.index + s.length;
   }

@@ -36,6 +36,7 @@ import { colorFor, fallbackTemplate, resolveTemplates, STARTER_PACKS, type Start
 import type {
   BinderNode,
   BlockRecord,
+  DocFormat,
   EntityChip,
   EntityRecord,
   EntryRecord,
@@ -439,7 +440,8 @@ export class Vault {
     const e = this.entries.get(id);
     if (!e) throw new Error(`No entry ${id}`);
     const st = this.files.get(e.file)!;
-    return { ...e, body: st.body, words: this.wordsOf(e.file) };
+    const format = (st.frontmatter.format && typeof st.frontmatter.format === 'object' ? st.frontmatter.format : {}) as DocFormat;
+    return { ...e, body: st.body, words: this.wordsOf(e.file), format };
   }
 
   private wordsOf(rel: string): number {
@@ -524,12 +526,13 @@ export class Vault {
     return { body: finalBody, changed: finalBody !== body, created: created.map((cid) => this.chip(this.entities.get(cid)!)) };
   }
 
-  updateEntry(id: string, patch: { title?: string; status?: EntryStatus }) {
+  updateEntry(id: string, patch: { title?: string; status?: EntryStatus; format?: DocFormat | null }) {
     return this.exclusive(async () => {
       const e = this.entries.get(id);
       if (!e) throw new Error(`No entry ${id}`);
       const st = this.files.get(e.file)!;
       if (patch.status) st.frontmatter.status = patch.status;
+      if (patch.format !== undefined) st.frontmatter.format = patch.format && Object.keys(patch.format).length ? patch.format : undefined;
       let rel = e.file;
       if (patch.title !== undefined && patch.title.trim() && patch.title !== e.title) {
         st.frontmatter.title = patch.title.trim();

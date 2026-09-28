@@ -446,7 +446,12 @@ export function plainText(text: string, resolver?: NameResolver): string {
     last = t.to;
   }
   out += text.slice(last);
-  return out.replace(/^#{1,6}\s+/, '').replace(/[ \t]+/g, ' ').trim();
+  return out
+    .replace(/^#{1,6}\s+/, '')
+    .replace(/<\/?u>/g, '')
+    .replace(/==([^=\n]+)==/g, '$1')
+    .replace(/[ \t]+/g, ' ')
+    .trim();
 }
 
 export function countWords(text: string): number {

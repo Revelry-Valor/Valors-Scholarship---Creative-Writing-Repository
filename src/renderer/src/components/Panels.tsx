@@ -59,6 +59,14 @@ function QuickReference() {
       <h3>Keys</h3>
       <dl className="keys">
         {[
+          ['Ctrl+B / I / U', 'Bold / italic / underline'],
+          ['Ctrl+Shift+X', 'Strikethrough'],
+          ['Ctrl+Shift+H', 'Highlight'],
+          ['Ctrl+Alt+1/2/3', 'Title / heading / subheading'],
+          ['Ctrl+Alt+0', 'Normal text'],
+          ['Ctrl+Shift+8 / 7', 'Bulleted / numbered list'],
+          ['Ctrl+Shift+9', 'Quote'],
+          ['Ctrl+Shift+Enter', 'Focus mode'],
           ['Ctrl+O', 'Jump to entry or entity'],
           ['Ctrl+K', 'Commands'],
           ['Ctrl+N', 'New document'],

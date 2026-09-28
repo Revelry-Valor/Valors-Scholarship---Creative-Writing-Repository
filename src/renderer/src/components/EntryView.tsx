@@ -8,6 +8,9 @@ import { BlockText } from './BlockText';
 import type { EntryStatus } from '../../../core/types';
 import { countWords, plainText } from '../../../core/markup';
 import { splitBlocks } from '../../../core/document';
+import type { DocFormat } from '../../../core/types';
+import type { EditorView } from '@codemirror/view';
+import { FormatBar, formatStyle, loadDefaultFormat } from './FormatBar';
 
 type Entry = ApiResult<'getEntry'>;
 
@@ -27,6 +30,10 @@ export function EntryView({ id, focusBlock, onHandle }: { id: string; focusBlock
   const [words, setWords] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const handle = useRef<EditorHandle | null>(null);
+  const [view, setView] = useState<EditorView | null>(null);
+  const [tick, setTick] = useState(0);
+  const tickFrame = useRef(0);
+  const [format, setFormat] = useState<Required<DocFormat>>(loadDefaultFormat);
 
   useEffect(() => {
     let live = true;
@@ -37,6 +44,7 @@ export function EntryView({ id, focusBlock, onHandle }: { id: string; focusBlock
         setEntry(e);
         setTitle(e.title);
         setWords(e.words);
+        setFormat({ ...loadDefaultFormat(), ...(e.format ?? {}) });
       })
       .catch((err) => setError((err as Error).message));
     return () => {
@@ -71,9 +79,16 @@ export function EntryView({ id, focusBlock, onHandle }: { id: string; focusBlock
     setEntry((cur) => (cur ? { ...cur, title: e.title, file: e.file } : cur));
   };
 
+  const changeFormat = (patch: Partial<DocFormat>) => {
+    const next = { ...format, ...patch };
+    setFormat(next);
+    void api.updateEntry(id, { format: next });
+  };
+
   return (
-    <div className="entry-view">
-      <div className="doc-column">
+    <div className={`entry-view para-${format.paragraphs} align-${format.align}`} style={formatStyle(format)}>
+      <FormatBar view={view} tick={tick} format={format} onFormat={changeFormat} focusMode={app.focusMode} onFocusMode={() => app.setFocusMode(!app.focusMode)} />
+      <div className="doc-column page">
         <header className="entry-header">
           <input
             className="entry-title"
@@ -126,8 +141,13 @@ export function EntryView({ id, focusBlock, onHandle }: { id: string; focusBlock
           focusBlock={focusBlock}
           autoFocus={!focusBlock && !entry.body.trim()}
           placeholder="Start writing. Type @ to tag a person, place or topic…"
+          onUpdate={() => {
+            cancelAnimationFrame(tickFrame.current);
+            tickFrame.current = requestAnimationFrame(() => setTick((n) => n + 1));
+          }}
           onReady={(h) => {
             handle.current = h;
+            setView(h.view);
             onHandle?.(h);
           }}
           onSave={async (body) => {

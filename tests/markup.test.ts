@@ -96,6 +96,12 @@ describe('document blocks', () => {
     expect(ids.every(Boolean)).toBe(true);
   });
 
+  it('keeps spaces typed at the end of a block (they are not part of the hidden id)', () => {
+    const b = splitBlocks('I read scouch  ^b-abc123')[0];
+    expect(b.text).toBe('I read scouch ');
+    expect(b.id).toBe('b-abc123');
+  });
+
   it('keeps the first id when two paragraphs are merged', () => {
     const body = 'first half ^b-aaaaaa\nsecond half ^b-bbbbbb\n';
     const out = applyEdits(body, planBlockIds(body));

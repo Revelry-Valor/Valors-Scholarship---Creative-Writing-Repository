@@ -28,7 +28,8 @@ export interface ParsedFile {
 }
 
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
-const TRAILING_ID_RE = /[ \t]+\^(b-[a-z0-9]+)[ \t]*$/;
+// Exactly one space separates text from its id, so trailing spaces you typed stay yours.
+const TRAILING_ID_RE = /[ \t]\^(b-[a-z0-9]+)[ \t]*$/;
 const LIST_ITEM_RE = /^(?:[-*+]|\d+[.)])\s/;
 
 export function splitFrontmatter(content: string): { frontmatter: Record<string, unknown>; body: string; bodyOffset: number } {

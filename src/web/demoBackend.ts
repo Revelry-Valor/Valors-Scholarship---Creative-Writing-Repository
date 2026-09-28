@@ -24,7 +24,9 @@ async function seed() {
 - On a new line, type \`@Scouch\` and a sentence. Watch the coloured stripe appear in the margin: that paragraph now lives on Apple Scouch's profile too.
 - After a tag, type \`{\` to set a fact from that person's template, like when they were born.
 - Open "Early Church Fathers — overview" in the binder, then open Apple Scouch's profile from the Entities list. Click a paragraph there and edit it; the change shows up in the entry.
-- Press Ctrl+O to jump anywhere, Ctrl+K for every command, and F1 for the markup cheat sheet.
+- Format like a word processor: the toolbar above the page has paragraph styles, fonts, text size, **bold**, *italic*, lists and ==highlights==. Ctrl+B, Ctrl+I and Ctrl+U work too. Enter starts a new paragraph; Shift+Enter breaks a line.
+- Open "Page ▾" in the toolbar for line spacing, book-style indented paragraphs, justified text and page width.
+- Press Ctrl+O to jump anywhere. "Commands ▾" and "? Guide" in the top bar list every command and all the markup.
 - Delete a whole paragraph that is filed to a profile, and you'll be asked before it disappears from those pages.
 `,
   );

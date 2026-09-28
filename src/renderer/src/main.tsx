@@ -6,6 +6,18 @@ import { DialogProvider } from './components/Dialogs';
 import { StartScreen } from './components/StartScreen';
 import { Workspace } from './components/Workspace';
 import { applyTheme } from './theme';
+import '@fontsource/literata/latin-400.css';
+import '@fontsource/literata/latin-400-italic.css';
+import '@fontsource/literata/latin-700.css';
+import '@fontsource/eb-garamond/latin-400.css';
+import '@fontsource/eb-garamond/latin-400-italic.css';
+import '@fontsource/eb-garamond/latin-700.css';
+import '@fontsource/source-sans-3/latin-400.css';
+import '@fontsource/source-sans-3/latin-400-italic.css';
+import '@fontsource/source-sans-3/latin-700.css';
+import '@fontsource/courier-prime/latin-400.css';
+import '@fontsource/courier-prime/latin-400-italic.css';
+import '@fontsource/courier-prime/latin-700.css';
 import './styles.css';
 
 type VaultInfo = NonNullable<ApiResult<'appState'>['vault']>;
