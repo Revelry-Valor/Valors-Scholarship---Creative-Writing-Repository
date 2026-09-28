@@ -8,6 +8,7 @@
 //   binder.yaml     manual ordering of the binder
 //   triggers.yaml   trigger-word themes for the active scan
 //   research.yaml   saved research lookups
+//   claims.yaml     evidence attached to paragraphs marked !claim
 //   .meta/          block authorship and history (keep)
 //   .index/         generated, safe to delete
 //
@@ -36,6 +37,7 @@ import { MetaStore } from './meta';
 import { NameTable } from './names';
 import { importText, type ImportOptions } from './importer';
 import { compileThemes, defaultThemes, type TriggerTheme } from './triggers';
+import { claimViews, type ClaimLedger, type EvidenceStance } from './compare';
 import { DEFAULT_DETECTORS, scanBlock, scanNewNames, type ScanBlock, type ScanContext, type Suggestion, type SuggestionKind } from './scan';
 import { colorFor, fallbackTemplate, resolveTemplates, STARTER_PACKS, WORLD_TEMPLATES, type StarterPack } from './templates';
 import type {
@@ -402,7 +404,7 @@ export class Vault {
    * File a paragraph of an imported source to an entity (and optionally a section), or mark it.
    * The tag is appended to the paragraph, so the source text itself is unchanged.
    */
-  annotateLibraryBlock(blockId: string, action: { entityId?: string; section?: string; mark?: 'key' | 'check' }) {
+  annotateLibraryBlock(blockId: string, action: { entityId?: string; section?: string; mark?: 'key' | 'check' | 'claim' }) {
     return this.exclusive(async () => {
       const b = this.getBlock(blockId);
       if (b.owner.kind !== 'library') throw new Error('Not a library paragraph');
@@ -1292,6 +1294,58 @@ export class Vault {
       await this.toTrash(`views/${id}.yaml`);
       this.emit({ files: [`views/${id}.yaml`], entities: false, binder: true });
     });
+  }
+
+  // ---------------------------------------------------------------- claims & evidence (claims.yaml)
+
+  private async readClaims(): Promise<ClaimLedger> {
+    try {
+      const d = YAML.parse(await fs.readFile(this.abs('claims.yaml'), 'utf8')) as ClaimLedger;
+      return { claims: d?.claims ?? {} };
+    } catch {
+      return { claims: {} };
+    }
+  }
+
+  async listClaims() {
+    return claimViews(this, await this.readClaims());
+  }
+
+  /** Attach a paragraph (yours or an imported one) to a claim as evidence for or against it. */
+  addEvidence(claimId: string, blockId: string, stance: EvidenceStance, note?: string) {
+    return this.exclusive(async () => {
+      if (!this.getBlock(claimId).marks.includes('claim')) throw new Error('That paragraph is not marked as a claim');
+      this.getBlock(blockId);
+      if (claimId === blockId) throw new Error('A claim cannot be its own evidence');
+      const d = await this.readClaims();
+      const c = (d.claims[claimId] ??= { evidence: [] });
+      c.evidence = c.evidence.filter((x) => x.block !== blockId);
+      c.evidence.push({ block: blockId, stance, ...(note ? { note } : {}) });
+      await this.writeRel('claims.yaml', YAML.stringify(d));
+      this.emit({ files: ['claims.yaml'], entities: false });
+      return true;
+    });
+  }
+
+  removeEvidence(claimId: string, blockId: string) {
+    return this.exclusive(async () => {
+      const d = await this.readClaims();
+      const c = d.claims[claimId];
+      if (!c) return false;
+      c.evidence = c.evidence.filter((x) => x.block !== blockId);
+      if (!c.evidence.length) delete d.claims[claimId];
+      await this.writeRel('claims.yaml', YAML.stringify(d));
+      this.emit({ files: ['claims.yaml'], entities: false });
+      return true;
+    });
+  }
+
+  /** Mark or unmark any paragraph as a claim (imported ones included). */
+  toggleClaim(blockId: string) {
+    const b = this.getBlock(blockId);
+    if (b.owner.kind === 'library' && !b.marks.includes('claim')) return this.annotateLibraryBlock(blockId, { mark: 'claim' });
+    const text = b.marks.includes('claim') ? b.text.replace(/\s*!claim(?![\p{L}\p{N}_])/u, '') : `${b.text.trimEnd()} !claim`;
+    return this.updateBlock(blockId, text);
   }
 
   // ---------------------------------------------------------------- saved lookups (research.yaml)

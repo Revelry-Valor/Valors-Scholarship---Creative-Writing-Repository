@@ -427,7 +427,7 @@ export function searchBlocks(v: Vault, query: string, filters: SearchFilters = {
 // ---------------------------------------------------------------- key details
 
 export function isMarked(b: BlockRecord): boolean {
-  return (b.marks?.length ?? 0) > 0 || (b.keyPhrases?.length ?? 0) > 0;
+  return (b.marks ?? []).some((m) => m === 'key' || m === 'check') || (b.keyPhrases?.length ?? 0) > 0;
 }
 
 export interface KeyDetailFilters {

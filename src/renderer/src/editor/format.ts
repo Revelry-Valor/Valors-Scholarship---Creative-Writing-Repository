@@ -170,8 +170,8 @@ export function insertMarkup(view: EditorView, kind: 'tag' | 'create' | 'topic' 
   return true;
 }
 
-/** Toggle a paragraph mark (`!key` / `!check`) on the paragraph(s) at the cursor. */
-export function toggleMark(view: EditorView, mark: 'key' | 'check'): boolean {
+/** Toggle a paragraph mark (`!key` / `!check` / `!claim`) on the paragraph(s) at the cursor. */
+export function toggleMark(view: EditorView, mark: 'key' | 'check' | 'claim'): boolean {
   const { state } = view;
   const blocks = state.field(analysisField, false) ?? [];
   const sel = state.selection.main;

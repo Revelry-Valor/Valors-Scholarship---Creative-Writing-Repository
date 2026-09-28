@@ -9,6 +9,7 @@ import { layeredLayout, neighbourhood, radialLayout, type LEdge } from './layout
 import { formatSort } from '../../../core/dates';
 import type { ViewDef, ViewKind } from '../../../core/types';
 import type { GraphEdge, GraphNode } from '../../../core/graph';
+import { ParallelPage, TablePage } from './Compare';
 
 type Graph = ApiResult<'graph'>;
 type Timeline = ApiResult<'timeline'>;
@@ -20,6 +21,8 @@ export const VIEW_KINDS: Array<{ id: ViewKind; label: string; icon: string; blur
   { id: 'tech', label: 'Tech tree', icon: '⚙', blurb: 'Technologies left to right, from their “requires” and “leads to” facts.' },
   { id: 'radial', label: 'Radial chart', icon: '◎', blurb: 'One nation or person in the centre, everyone connected to them around it.' },
   { id: 'web', label: 'Relationship web', icon: '✺', blurb: 'Everyone of the chosen types on a circle, with who is what to whom.' },
+  { id: 'parallel', label: 'Parallel accounts', icon: '⫴', blurb: 'Sources side by side, lined up by verse or by page: translations, Gospels, Fathers on one passage.' },
+  { id: 'table', label: 'Table', icon: '▦', blurb: 'One row per page, one column per fact or count, sortable and downloadable.' },
 ];
 
 export const CATEGORIES: Array<{ id: string; label: string }> = [
@@ -61,6 +64,7 @@ export function ViewPage({ id }: { id: string }) {
   }, [id]);
   useEffect(() => {
     if (!def) return;
+    if (def.kind === 'parallel' || def.kind === 'table') return;
     if (def.kind === 'timeline') api.timeline().then(setTimeline);
     else api.graph().then(setGraph);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -74,6 +78,8 @@ export function ViewPage({ id }: { id: string }) {
     setDef(next);
     void api.saveView(next);
   };
+  if (def.kind === 'parallel') return <ParallelPage def={def} setDef={setDef} update={update} />;
+  if (def.kind === 'table') return <TablePage def={def} setDef={setDef} update={update} />;
 
   const types = app.nameData.templates;
   const entities = [...app.nameData.entities].sort((a, b) => a.name.localeCompare(b.name));

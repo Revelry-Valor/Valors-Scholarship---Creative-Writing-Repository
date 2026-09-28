@@ -144,7 +144,7 @@ export function BlockText({ text, onOpenEntity, highlights }: { text: string; on
         case 'mark':
           parts.push(
             <span key={key} className={`badge mark-badge mark-${t.mark}`}>
-              {t.mark === 'key' ? '★ Important' : '⚑ Check this'}
+              {t.mark === 'key' ? '★ Important' : t.mark === 'claim' ? '⚖ Claim' : '⚑ Check this'}
             </span>,
           );
           return;

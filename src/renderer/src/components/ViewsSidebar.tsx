@@ -11,7 +11,7 @@ type Dialogs = ReturnType<typeof useDialogs>;
 
 export async function newView(app: App, dialogs: Dialogs) {
   const kind = await dialogs.pick<ViewKind>({
-    title: 'New timeline or tree',
+    title: 'New timeline, tree, table or parallel view',
     items: VIEW_KINDS.map((k) => ({ label: `${k.icon}  ${k.label}`, detail: k.blurb, value: k.id })),
   });
   if (!kind) return;
@@ -27,6 +27,10 @@ export async function newView(app: App, dialogs: Dialogs) {
       })) ?? undefined;
   }
   const def = await api.createView({ name, kind, root });
+  if (kind === 'table') {
+    const type = await dialogs.pick<string>({ title: 'A row for every…', items: app.nameData.templates.map((t) => ({ label: t.name, value: t.id, color: t.color })) });
+    if (type) await api.saveView({ ...def, types: [type] });
+  }
   app.openTab({ kind: 'view', id: def.id });
 }
 
@@ -68,8 +72,8 @@ export function ViewsSection() {
   return (
     <div className="side-section views-section">
       <div className="side-head">
-        <span>Timelines &amp; Trees</span>
-        <button className="icon-btn" title="New timeline or tree" onClick={() => newView(app, dialogs)}>
+        <span>Timelines, Trees &amp; Tables</span>
+        <button className="icon-btn" title="New timeline, tree, table or parallel view" onClick={() => newView(app, dialogs)}>
           +
         </button>
       </div>
@@ -91,7 +95,7 @@ export function ViewsSection() {
         {!views.length && (
           <li className="tree-empty">
             <button className="btn btn-ghost small" onClick={() => newView(app, dialogs)}>
-              + Family tree, timeline, radial chart…
+              + Family tree, timeline, table, parallels…
             </button>
           </li>
         )}

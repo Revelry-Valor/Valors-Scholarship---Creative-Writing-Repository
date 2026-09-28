@@ -253,10 +253,23 @@ async function addScholarshipLibrary() {
 
 async function addScholarshipViews() {
   const v = await Vault.open(VAULT, { author: 'you' });
-  if ((await v.listViews()).length) return;
-  await v.createView({ name: 'Church history', kind: 'timeline' });
-  const t = await v.createView({ name: 'Teachers and students', kind: 'lineage' });
-  await v.saveView({ ...t, relation: 'teacher' });
+  const have = await v.listViews();
+  if (!have.length) {
+    await v.createView({ name: 'Church history', kind: 'timeline' });
+    const t = await v.createView({ name: 'Teachers and students', kind: 'lineage' });
+    await v.saveView({ ...t, relation: 'teacher' });
+  }
+  // Added later: a table of the Fathers (kept once made, even if you delete it and reload).
+  try {
+    if (localStorage.getItem('lr.demo.table.v1')) return;
+    localStorage.setItem('lr.demo.table.v1', '1');
+  } catch {
+    return;
+  }
+  if (!have.some((x) => x.kind === 'table')) {
+    const tab = await v.createView({ name: 'Church Fathers', kind: 'table' });
+    await v.saveView({ ...tab, types: ['church-father'], fields: ['born', 'died', 'region', 'teachers', '@mentions', '#grace'] });
+  }
 }
 
 const backend = new Backend('/home/you/.config/living-repository');

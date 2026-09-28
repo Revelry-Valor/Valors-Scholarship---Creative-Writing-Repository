@@ -15,6 +15,7 @@ import { buildGraph, buildTimeline } from '../core/graph';
 import type { TriggerTheme } from '../core/triggers';
 import { lookup, quoteFor, type LookupQuery, type LookupResult } from '../core/lookup';
 import type { SavedLookup } from '../core/vault';
+import { entityTable, parallelView, type EvidenceStance } from '../core/compare';
 
 export interface RecentVault {
   path: string;
@@ -192,7 +193,7 @@ export class Backend {
     listLibrary: async () => this.v().listLibrary(),
     getLibraryDoc: async (id: string) => this.v().getLibraryDoc(id),
     deleteLibrary: async (target: { id?: string; collection?: string }) => this.v().deleteLibrary(target),
-    annotateLibraryBlock: async (blockId: string, action: { entityId?: string; section?: string; mark?: 'key' | 'check' }) => this.v().annotateLibraryBlock(blockId, action),
+    annotateLibraryBlock: async (blockId: string, action: { entityId?: string; section?: string; mark?: 'key' | 'check' | 'claim' }) => this.v().annotateLibraryBlock(blockId, action),
     scan: async (scope: Parameters<Vault['scan']>[0], opts?: Parameters<Vault['scan']>[1]) => this.v().scan(scope, opts),
     acceptSuggestion: async (id: string, choice?: { entityId?: string; type?: string; section?: string }) => this.v().acceptSuggestion(id, choice),
     dismissSuggestion: async (id: string, mode?: 'once' | 'here' | 'everywhere') => this.v().dismissSuggestion(id, mode),
@@ -224,6 +225,12 @@ export class Backend {
     listLookups: async () => this.v().listLookups(),
     saveLookup: async (l: SavedLookup) => this.v().saveLookup(l),
     deleteLookup: async (name: string) => this.v().deleteLookup(name),
+    entityTable: async (def: Pick<ViewDef, 'types' | 'fields'>) => entityTable(this.v(), def),
+    parallel: async (def: Pick<ViewDef, 'columns' | 'align'>) => parallelView(this.v(), def),
+    listClaims: async () => this.v().listClaims(),
+    addEvidence: async (claimId: string, blockId: string, stance: EvidenceStance, note?: string) => this.v().addEvidence(claimId, blockId, stance, note),
+    removeEvidence: async (claimId: string, blockId: string) => this.v().removeEvidence(claimId, blockId),
+    toggleClaim: async (blockId: string) => this.v().toggleClaim(blockId),
     graph: async () => buildGraph(this.v()),
     timeline: async () => buildTimeline(this.v()),
     getEntityNotes: async (id: string) => {

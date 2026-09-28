@@ -133,6 +133,9 @@ export function FormatBar({
       <button className={`fb-btn fb-check ${blockMarks.includes('check') ? 'on' : ''}`} title="Mark to check later (needs verifying)" aria-pressed={blockMarks.includes('check')} onMouseDown={keep} onClick={run((v) => toggleMark(v, 'check'))}>
         ⚑
       </button>
+      <button className={`fb-btn fb-claim ${blockMarks.includes('claim') ? 'on' : ''}`} title="Make this paragraph a claim, to weigh evidence for and against it (Claims & evidence)" aria-pressed={blockMarks.includes('claim')} onMouseDown={keep} onClick={run((v) => toggleMark(v, 'claim'))}>
+        ⚖
+      </button>
       <span className="fb-sep" />
       <button className={`fb-btn ${para === 'bullet' ? 'on' : ''}`} title="Bulleted list (Ctrl+Shift+8)" onMouseDown={keep} onClick={run((v) => setParagraphStyle(v, 'bullet'))}>
         •≡

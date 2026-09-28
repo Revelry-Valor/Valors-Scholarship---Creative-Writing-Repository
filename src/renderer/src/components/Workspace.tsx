@@ -17,6 +17,7 @@ import { KeyDetailsPage } from './KeyDetails';
 import { LibraryReader, importToLibrary } from './Library';
 import { ReviewPage, SuggestBadge, TriggerWordsPage, openReview } from './Review';
 import { ResearchPane, ResearchSplitter } from './Research';
+import { ClaimsPage } from './Claims';
 import { SpellingSettings } from './SpellingSettings';
 import { setSpellingPrefs } from '../editor/spelling';
 import { newView, addType } from './ViewsSidebar';
@@ -184,6 +185,7 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
         hint: 'Ctrl+Shift+L',
         run: () => app.setPanels({ research: true }),
       },
+      { id: 'claims', label: 'Claims & evidence: weigh what supports or opposes each claim', run: () => app.openTab({ kind: 'claims' }) },
       {
         id: 'triggers',
         label: 'Edit trigger words (canon, prophecy, baptism…)',
@@ -322,6 +324,7 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
     if (t.kind === 'marks') return '★ Key details';
     if (t.kind === 'review') return `✦ Review · ${t.label}`;
     if (t.kind === 'triggers') return '✦ Trigger words';
+    if (t.kind === 'claims') return '⚖ Claims';
     if (t.kind === 'library') return <LibraryTitle id={t.id} />;
     if (t.kind === 'view') return <ViewTitle id={t.id} />;
     return null;
@@ -439,6 +442,7 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
             {activeTab?.kind === 'marks' && <KeyDetailsPage />}
             {activeTab?.kind === 'review' && <ReviewPage key={JSON.stringify(activeTab.scope)} scope={activeTab.scope} label={activeTab.label} />}
             {activeTab?.kind === 'triggers' && <TriggerWordsPage />}
+            {activeTab?.kind === 'claims' && <ClaimsPage />}
             {activeTab?.kind === 'library' && <LibraryReader key={activeTab.key} id={activeTab.id} focusBlock={activeTab.focusBlock} />}
             {!activeTab && <Welcome onNewEntry={newEntry} onNewEntity={() => newEntity()} onGoto={() => setPalette('switch')} />}
           </div>

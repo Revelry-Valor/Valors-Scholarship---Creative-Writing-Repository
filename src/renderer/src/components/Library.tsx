@@ -6,6 +6,7 @@ import { useApp } from '../state';
 import { useDialogs } from './Dialogs';
 import { BlockText } from './BlockText';
 import { afterImport, openReview } from './Review';
+import { addAsEvidence } from './Claims';
 
 type Lib = ApiResult<'listLibrary'>;
 type Doc = ApiResult<'getLibraryDoc'>;
@@ -387,6 +388,9 @@ export function LibraryReader({ id, focusBlock }: { id: string; focusBlock?: str
                   </button>
                   <button className="foot-btn" onClick={() => api.annotateLibraryBlock(b.id, { mark: 'check' })} title="Mark to check">
                     ⚑
+                  </button>
+                  <button className="foot-btn" onClick={() => addAsEvidence(app, dialogs, b.id)} title="Evidence for or against a claim, or make it a claim">
+                    ⚖
                   </button>
                 </div>
               </div>

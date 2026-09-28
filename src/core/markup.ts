@@ -22,7 +22,7 @@ export type Resolution =
   | { status: 'missing' };
 
 /** Paragraph marks: `!key` (important) and `!check` (needs verifying). */
-export const MARK_KINDS = ['key', 'check'] as const;
+export const MARK_KINDS = ['key', 'check', 'claim'] as const;
 export type MarkKind = (typeof MARK_KINDS)[number];
 
 export const CONFIDENCE_LEVELS = ['certain', 'probable', 'possible', 'disputed', 'legendary'] as const;
@@ -288,9 +288,9 @@ export function tokenize(text: string, resolver?: NameResolver): Token[] {
       }
     }
 
-    // !key / !check — mark the whole paragraph
+    // !key / !check / !claim — mark the whole paragraph
     if (ch === '!' && text[i + 1] !== '!' && isBoundaryBefore(text, i)) {
-      const m = /^!(key|check)(?![\p{L}\p{N}_])/u.exec(text.slice(i));
+      const m = /^!(key|check|claim)(?![\p{L}\p{N}_])/u.exec(text.slice(i));
       if (m) {
         tokens.push({ kind: 'mark', from: i, to: i + m[0].length, mark: m[1] as MarkKind });
         i += m[0].length;

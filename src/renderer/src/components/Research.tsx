@@ -7,6 +7,7 @@ import { useApp } from '../state';
 import { useDialogs } from './Dialogs';
 import { BlockText } from './BlockText';
 import { insertParagraph } from '../editor/Editor';
+import { addAsEvidence } from './Claims';
 import { CANON_WORKS, STANCES, cellStance, type Stance } from '../../../core/lookup';
 import type { ScanScope, SavedLookup } from '../../../core/vault';
 import type { DocKind } from '../../../core/types';
@@ -297,6 +298,9 @@ function HitList({ hits, context }: { hits: Hit[]; context: boolean }) {
                         </button>
                       </>
                     )}
+                    <button className="foot-btn" title="Evidence for or against a claim, or make it a claim" onClick={() => addAsEvidence(app, dialogs, h.blockId)}>
+                      ⚖
+                    </button>
                     <button className="foot-btn" onClick={() => app.openTab({ kind: h.source.kind as DocKind, id: h.source.id, focusBlock: h.blockId })}>
                       Open
                     </button>

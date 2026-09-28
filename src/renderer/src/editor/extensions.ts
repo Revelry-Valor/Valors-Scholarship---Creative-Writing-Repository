@@ -178,7 +178,7 @@ function buildDecorations(view: EditorView): { all: DecorationSet; atomic: Decor
       if (hashes && !raw) ranges.push(Decoration.mark({ class: 'cm-heading-mark' }).range(base, base + hashes[0].length));
     }
     // Marked paragraphs are tinted, so important details stand out on the page.
-    const markCls = b.analysis.marks.includes('key') ? 'cm-key-line' : b.analysis.marks.includes('check') ? 'cm-check-line' : '';
+    const markCls = b.analysis.marks.includes('key') ? 'cm-key-line' : b.analysis.marks.includes('check') ? 'cm-check-line' : b.analysis.marks.includes('claim') ? 'cm-claim-line' : '';
     if (markCls) {
       for (let p = base; p <= b.to; ) {
         const line = state.doc.lineAt(p);
@@ -301,6 +301,7 @@ function describeToken(t: Token, env: EditorEnv, warning?: string): { widget: Wi
     case 'scripture':
       return null;
     case 'mark':
+      if (t.mark === 'claim') return { widget: new BadgeWidget('', '⚖ Claim', 'cm-badge-claim', 'A claim — weigh evidence for and against it on the Claims page'), color: 'var(--claim)' };
       return t.mark === 'key'
         ? { widget: new BadgeWidget('', '★ Important', 'cm-badge-key', 'Marked important — listed in Key details and on its pages'), color: 'var(--key)' }
         : { widget: new BadgeWidget('', '⚑ Check this', 'cm-badge-check', 'Marked to verify — listed in Key details'), color: 'var(--warn)' };

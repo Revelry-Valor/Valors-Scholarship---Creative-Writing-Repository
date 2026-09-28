@@ -63,6 +63,9 @@ export function KeyDetailsPage() {
     <div className="kd-page">
       <header className="kd-page-head">
         <h1>Key details</h1>
+        <button className="linkish small kd-claims-link" onClick={() => app.openTab({ kind: 'claims' })}>
+          ⚖ Claims &amp; evidence →
+        </button>
         <p className="muted">
           Mark a paragraph with <kbd>Ctrl+Shift+K</kbd> or the ★ button (<code>!key</code>), something to verify with ⚑ (<code>!check</code>), or select words and press ★ to mark just that phrase (<code>!!like this!!</code>).
         </p>

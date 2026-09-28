@@ -200,7 +200,7 @@ export interface DocFormat {
   width?: 'narrow' | 'normal' | 'wide';
 }
 
-export type ViewKind = 'timeline' | 'family' | 'lineage' | 'tech' | 'radial' | 'web';
+export type ViewKind = 'timeline' | 'family' | 'lineage' | 'tech' | 'radial' | 'web' | 'parallel' | 'table';
 
 /** A saved timeline or chart (views/<id>.yaml). It stores settings, never content. */
 export interface ViewDef {
@@ -219,6 +219,14 @@ export interface ViewDef {
   types?: string[];
   /** Timelines: one lane per type, or one per entity. */
   lanes?: 'type' | 'entity';
+  /** Parallel accounts: the sources side by side (a document, a page, or a lookup). */
+  columns?: Array<{ source?: { kind: DocKind; id: string }; query?: string; label?: string }>;
+  /** Parallel accounts: line rows up by verse, by the page paragraphs are filed to, or in order. */
+  align?: 'verse' | 'tag' | 'order';
+  /** Extraction tables: the columns (fact keys, @computed, or #word). */
+  fields?: string[];
+  sortBy?: string;
+  sortDesc?: boolean;
 }
 
 /** Where a block lives: your writing, an entity's own page, or an imported source. */
