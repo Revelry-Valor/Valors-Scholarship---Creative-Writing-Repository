@@ -4250,3 +4250,42 @@ mark.hit {
   font-style: italic;
   font-weight: 500;
 }
+
+/* ---------- transcription */
+.transcribe-dialog {
+  width: min(680px, calc(100vw - 48px));
+}
+.seg-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.record-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  justify-content: center;
+}
+.rec-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--danger);
+  animation: rec-pulse 1s infinite alternate;
+}
+@keyframes rec-pulse {
+  to {
+    opacity: 0.3;
+  }
+}
+.transcript-preview {
+  width: 100%;
+  font: 14px/1.5 var(--serif);
+}
+.fb-mic.on {
+  color: var(--danger);
+}

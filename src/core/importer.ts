@@ -3,6 +3,7 @@
 // one verse per paragraph; other texts are split into paragraphs with headings.
 
 import { BOOKS, findScriptureRefs, type BookDef } from './scripture';
+import { isTranscriptFile, parseSubtitles, toParagraphs, transcriptText } from './transcript';
 
 export interface ImportOptions {
   title: string;
@@ -11,6 +12,8 @@ export interface ImportOptions {
   author?: string;
   date?: string;
   translation?: string;
+  /** Original file name: subtitle files (.srt, .vtt) become timed transcripts. */
+  filename?: string;
 }
 
 export interface ImportedFile {
@@ -251,6 +254,11 @@ function textBody(text: string): { body: string; paragraphs: number } {
 
 export function importText(opts: ImportOptions): ImportResult {
   const title = safeName(opts.title);
+  // Subtitles and timed transcripts: one paragraph per stretch of speech, with its time.
+  if (isTranscriptFile(opts.filename ?? '', opts.text)) {
+    const segs = parseSubtitles(opts.text);
+    if (segs) opts = { ...opts, kind: 'text', text: transcriptText(toParagraphs(segs)) };
+  }
   const verses = opts.kind === 'text' ? null : parseBible(opts.text);
   if ((opts.kind === 'bible' || opts.kind === 'auto' || !opts.kind) && verses && verses.length >= 5) {
     const translation = (opts.translation || title).trim();

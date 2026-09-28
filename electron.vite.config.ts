@@ -14,6 +14,7 @@ export default defineConfig({
   renderer: {
     root: resolve('src/renderer'),
     plugins: [react()],
+    worker: { format: 'es' },
     build: { minify: true, rollupOptions: { input: { index: resolve('src/renderer/index.html') } } },
   },
 });

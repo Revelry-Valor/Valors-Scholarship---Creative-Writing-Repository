@@ -6,6 +6,9 @@ import { undo, redo } from '@codemirror/commands';
 import { activeInline, currentParagraphStyle, insertMarkup, markImportant, setParagraphStyle, toggleInline, toggleMark, type InlineStyle, type ParagraphStyle } from '../editor/format';
 import { analysisField, blockAt } from '../editor/extensions';
 import type { DocFormat } from '../../../core/types';
+import { useApp } from '../state';
+import { useDialogs } from './Dialogs';
+import { canDictate, openTranscribe, startDictation } from './Transcribe';
 
 export const FONTS: Array<{ id: string; label: string; css: string }> = [
   { id: 'literata', label: 'Literata', css: "'Literata', Georgia, serif" },
@@ -70,6 +73,32 @@ export function FormatBar({
 }) {
   const [pageOpen, setPageOpen] = useState(false);
   const pageRef = useRef<HTMLDivElement>(null);
+  const app = useApp();
+  const dialogs = useDialogs();
+  const [dictating, setDictating] = useState<null | (() => void)>(null);
+  useEffect(() => () => dictating?.(), [dictating]);
+  const mic = () => {
+    if (!canDictate) return void openTranscribe(app, dialogs, 'record');
+    if (dictating) {
+      dictating();
+      setDictating(null);
+      return;
+    }
+    const stop = startDictation(
+      (text) => {
+        if (!view) return;
+        const at = view.state.selection.main.head;
+        const before = view.state.sliceDoc(Math.max(0, at - 1), at);
+        const insert = `${before && !/\s/.test(before) ? ' ' : ''}${text}`;
+        view.dispatch({ changes: { from: at, insert }, selection: { anchor: at + insert.length }, userEvent: 'input.dictate' });
+      },
+      (err) => {
+        setDictating(null);
+        if (err) app.notify(`Dictation stopped: ${err}`, 'error');
+      },
+    );
+    setDictating(() => stop);
+  };
   useEffect(() => {
     if (!pageOpen) return;
     const close = (e: MouseEvent) => {
@@ -135,6 +164,9 @@ export function FormatBar({
       </button>
       <button className={`fb-btn fb-claim ${blockMarks.includes('claim') ? 'on' : ''}`} title="Make this paragraph a claim, to weigh evidence for and against it (Claims & evidence)" aria-pressed={blockMarks.includes('claim')} onMouseDown={keep} onClick={run((v) => toggleMark(v, 'claim'))}>
         ⚖
+      </button>
+      <button className={`fb-btn fb-mic ${dictating ? 'on' : ''}`} title={canDictate ? (dictating ? 'Stop dictating' : 'Dictate: speak and your words are typed at the cursor') : 'Record and transcribe into this page (or transcribe an audio file)'} onMouseDown={keep} onClick={mic}>
+        🎙
       </button>
       <span className="fb-sep" />
       <button className={`fb-btn ${para === 'bullet' ? 'on' : ''}`} title="Bulleted list (Ctrl+Shift+8)" onMouseDown={keep} onClick={run((v) => setParagraphStyle(v, 'bullet'))}>

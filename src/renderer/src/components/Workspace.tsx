@@ -20,6 +20,7 @@ import { ResearchPane, ResearchSplitter } from './Research';
 import { ClaimsPage } from './Claims';
 import { ContradictionsPage } from './Contradictions';
 import { importLexicons } from './LexiconPanel';
+import { openTranscribe } from './Transcribe';
 import { SpellingSettings } from './SpellingSettings';
 import { setSpellingPrefs } from '../editor/spelling';
 import { newView, addType } from './ViewsSidebar';
@@ -189,6 +190,7 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
       },
       { id: 'lexicon', label: 'Lexicon: look up Greek, Hebrew or other words', hint: 'Ctrl+Shift+G', run: () => app.setPanels({ right: 'lexicon' }) },
       { id: 'import-lexicon', label: 'Import a lexicon (Strong’s, Greek, Hebrew, glossary)…', run: () => importLexicons(app, dialogs) },
+      { id: 'transcribe', label: 'Transcribe audio, video or a recording (sermons, lectures, dictation)…', run: () => openTranscribe(app, dialogs) },
       { id: 'conflicts', label: 'Find contradictions: facts, dates, links and statements that disagree', run: () => app.openTab({ kind: 'conflicts' }) },
       { id: 'claims', label: 'Claims & evidence: weigh what supports or opposes each claim', run: () => app.openTab({ kind: 'claims' }) },
       {

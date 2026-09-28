@@ -20,7 +20,7 @@ function toBase64(buf: ArrayBuffer): string {
   return btoa(s);
 }
 
-const titleFromFile = (name: string) => name.replace(/\.(txt|md|markdown|docx|csv|tsv|json|html?)$/i, '').replace(/[_]+/g, ' ').trim();
+const titleFromFile = (name: string) => name.replace(/\.(txt|md|markdown|docx|csv|tsv|json|html?|srt|vtt)$/i, '').replace(/[_]+/g, ' ').trim();
 
 /** The import dialog: files (several at once) or pasted text. */
 export async function importToLibrary(app: App, dialogs: Dialogs, files?: File[]) {
@@ -116,7 +116,7 @@ function ImportDialog({ initialFiles, onDone }: { initialFiles?: File[]; onDone:
           type="file"
           multiple
           hidden
-          accept=".txt,.md,.markdown,.docx,.csv,.tsv,.json,.html,.htm"
+          accept=".txt,.md,.markdown,.docx,.csv,.tsv,.json,.html,.htm,.srt,.vtt"
           onChange={(e) => {
             const list = [...(e.target.files ?? [])];
             setFiles(list);

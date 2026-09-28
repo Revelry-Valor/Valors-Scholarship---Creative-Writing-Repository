@@ -8,7 +8,18 @@ const shim = (f: string) => resolve('src/web/shims', f);
 
 export default defineConfig({
   root: 'src/web',
-  plugins: [react(), viteSingleFile()],
+  plugins: [
+    react(),
+    viteSingleFile(),
+    // Speech models cannot be downloaded inside the demo page: use a stub that says so.
+    {
+      name: 'whisper-stub',
+      enforce: 'pre',
+      resolveId(id) {
+        return /transcribe\/whisper$/.test(id) ? shim('whisper.ts') : null;
+      },
+    },
+  ],
   resolve: {
     alias: {
       'node:fs': shim('fs.ts'),

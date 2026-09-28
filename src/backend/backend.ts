@@ -158,7 +158,7 @@ export class Backend {
     rebuildIndex: async () => this.v().rebuildIndex(),
 
     binder: async () => this.v().getBinder(),
-    createEntry: async (opts: { title: string; parent?: BinderParent; index?: number }) => this.v().createEntry(opts),
+    createEntry: async (opts: { title: string; parent?: BinderParent; index?: number; body?: string }) => this.v().createEntry(opts),
     getEntry: async (id: string) => this.v().getEntry(id),
     saveEntry: async (id: string, body: string) => this.v().saveEntry(id, body),
     updateEntry: async (id: string, patch: Parameters<Vault['updateEntry']>[1]) => this.v().updateEntry(id, patch),
