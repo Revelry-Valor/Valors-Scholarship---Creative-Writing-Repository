@@ -13,6 +13,7 @@ import { tags as t } from '@lezer/highlight';
 import { planBlockIds } from '../../../core/document';
 import { analysisField, envField, openEntityAtCursor, setEnv, writingExtensions, type AnalyzedDocBlock, type EditorEnv } from './extensions';
 import { formattingExtensions, paragraphKeys } from './format';
+import { spellingExtensions } from './spelling';
 import { useApp } from '../state';
 import { api } from '../api';
 
@@ -201,6 +202,7 @@ export function Editor(props: EditorProps) {
         markdown({ base: markdownLanguage, addKeymap: false }),
         syntaxHighlighting(markdownStyle),
         formattingExtensions(),
+        spellingExtensions(),
         cmPlaceholder(props.placeholder ?? ''),
         flashField,
         writingExtensions({ stripe: !isBlock }),

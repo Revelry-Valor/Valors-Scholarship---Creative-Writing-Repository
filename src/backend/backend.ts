@@ -9,6 +9,7 @@ import { watch, type FSWatcher } from 'chokidar';
 import { Vault, type BinderParent, type ChangeEvent } from '../core/vault';
 import { buildProfile, blockView, keyDetails, quickSwitch, searchBlocks, type KeyDetailFilters, type SearchFilters } from '../core/views';
 import { STARTER_PACKS } from '../core/templates';
+import { DEFAULT_AUTOCORRECT, NAME_STOPWORDS, type AutocorrectPrefs } from '../core/autocorrect';
 import type { EntryStatus, TemplateDef, ViewDef } from '../core/types';
 import { buildGraph, buildTimeline } from '../core/graph';
 
@@ -22,6 +23,12 @@ export interface AppConfig {
   author: string;
   recent: RecentVault[];
   lastVault?: string;
+  prefs?: UserPrefs;
+}
+
+export interface UserPrefs {
+  spellcheck: boolean;
+  autocorrect: AutocorrectPrefs;
 }
 
 export type BackendEvent = ({ type: 'changed' } & ChangeEvent) | { type: 'vault-opened' } | { type: 'vault-closed' };
@@ -36,7 +43,7 @@ export class Backend {
 
   constructor(
     private configDir: string,
-    private hooks: { pickFolder?: () => Promise<string | null>; revealPath?: (p: string) => void } = {},
+    private hooks: { pickFolder?: () => Promise<string | null>; revealPath?: (p: string) => void; onPrefs?: (p: UserPrefs) => void; onVaultOpened?: (words: string[]) => void } = {},
   ) {}
 
   async init(): Promise<void> {
@@ -79,6 +86,23 @@ export class Backend {
       vault: this.vault ? this.vault.info() : null,
       canPickFolder: !!this.hooks.pickFolder,
     }),
+    getPrefs: async (): Promise<UserPrefs> => ({
+      spellcheck: this.config.prefs?.spellcheck ?? true,
+      autocorrect: { ...DEFAULT_AUTOCORRECT, ...(this.config.prefs?.autocorrect ?? {}) },
+    }),
+    setPrefs: async (prefs: UserPrefs) => {
+      this.config.prefs = prefs;
+      await this.saveConfig();
+      this.hooks.onPrefs?.(prefs);
+      return prefs;
+    },
+    spellingWords: async () => {
+      // Every word of every entity name, so the spell checker never flags your people and places.
+      if (!this.vault) return [];
+      const words = new Set<string>();
+      for (const e of this.vault.entities.values()) for (const n of [e.name, ...e.aliases]) for (const w of n.split(/[\s-]+/)) if (/^[\p{L}'’]{2,}$/u.test(w) && !NAME_STOPWORDS.has(w.toLowerCase())) words.add(w);
+      return [...words];
+    },
     setAuthor: async (name: string) => {
       this.config.author = name.trim() || safeUser();
       if (this.vault) this.vault.author = this.config.author;
@@ -106,6 +130,7 @@ export class Backend {
       this.config.lastVault = vault.root;
       await this.saveConfig();
       this.emit({ type: 'vault-opened' });
+      this.hooks.onVaultOpened?.(await this.methods.spellingWords());
       return vault.info();
     },
     closeVault: async () => {

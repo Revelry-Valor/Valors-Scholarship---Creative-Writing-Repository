@@ -14,6 +14,8 @@ import { ContextMenu, type MenuSpec } from './Menu';
 import { TemplateEditor } from './TemplateEditor';
 import { ViewPage } from '../charts/ViewPage';
 import { KeyDetailsPage } from './KeyDetails';
+import { SpellingSettings } from './SpellingSettings';
+import { setSpellingPrefs } from '../editor/spelling';
 import { newView, addType } from './ViewsSidebar';
 
 export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
@@ -23,6 +25,10 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
   const [theme, setTheme] = useState<Theme>(currentTheme());
   const [navOpen, setNavOpen] = useState(false);
   const [cmdMenu, setCmdMenu] = useState<MenuSpec>(null);
+  useEffect(() => {
+    api.getPrefs().then(setSpellingPrefs).catch(() => undefined);
+  }, []);
+  const openSpelling = useCallback(() => dialogs.show((close) => <SpellingSettings onClose={() => close(null)} />), [dialogs]);
   useEffect(() => setNavOpen(false), [app.active]);
 
   const activeTab = app.tabs.find((t) => t.key === app.active) ?? null;
@@ -106,6 +112,7 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
           await app.refreshNames();
         },
       },
+      { id: 'spelling', label: 'Spelling & autocorrect…', run: openSpelling },
       { id: 'author', label: 'Set your name (block signatures)', run: setAuthor },
       {
         id: 'rebuild',
@@ -138,7 +145,7 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
           ]
         : []),
     ],
-    [app, dialogs, newEntity, newEntry, toggleReference, theme, cycleTheme, setAuthor, onCloseVault],
+    [app, dialogs, newEntity, newEntry, toggleReference, theme, cycleTheme, setAuthor, onCloseVault, openSpelling],
   );
 
   useEffect(() => {
@@ -264,7 +271,7 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
         </div>
       </div>
       <RightPanel />
-      <StatusBar onAuthor={setAuthor} theme={theme} onTheme={cycleTheme} />
+      <StatusBar onAuthor={setAuthor} theme={theme} onTheme={cycleTheme} onSpelling={openSpelling} />
       {palette && <Palette mode={palette} commands={commands} onClose={() => setPalette(null)} />}
       <ContextMenu spec={cmdMenu} onClose={() => setCmdMenu(null)} />
       <div className="toasts" aria-live="polite">
@@ -342,7 +349,7 @@ function Welcome({ onNewEntry, onNewEntity, onGoto }: { onNewEntry: () => void; 
   );
 }
 
-function StatusBar({ onAuthor, theme, onTheme }: { onAuthor: () => void; theme: Theme; onTheme: () => void }) {
+function StatusBar({ onAuthor, theme, onTheme, onSpelling }: { onAuthor: () => void; theme: Theme; onTheme: () => void; onSpelling: () => void }) {
   const app = useApp();
   const c = app.info.counts;
   const saveLabel = { saved: 'Saved', saving: 'Saving…', unsaved: 'Editing…', error: 'Save failed' }[app.saveState];
@@ -359,6 +366,9 @@ function StatusBar({ onAuthor, theme, onTheme }: { onAuthor: () => void; theme: 
       </button>
       <button className="status-btn" onClick={() => app.setPanels({ right: app.panels.right === 'reference' ? null : 'reference' })} title="F1">
         Markup help
+      </button>
+      <button className="status-btn" onClick={onSpelling} title="Spelling & autocorrect">
+        ABC✓
       </button>
       <button className="status-btn" onClick={onTheme} title="Theme">
         {theme === 'dark' ? '☾' : theme === 'light' ? '☀' : '◐'}

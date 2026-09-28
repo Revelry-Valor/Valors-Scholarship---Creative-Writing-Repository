@@ -2937,3 +2937,28 @@ kbd {
   opacity: 1;
   margin-left: 8px;
 }
+
+/* ---------- settings */
+.check-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 7px 0;
+  cursor: pointer;
+}
+.check-row input {
+  margin-top: 3px;
+  accent-color: var(--accent);
+}
+.check-row span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.check-row small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.modal:has(.spelling-settings) {
+  width: min(560px, calc(100vw - 32px));
+}

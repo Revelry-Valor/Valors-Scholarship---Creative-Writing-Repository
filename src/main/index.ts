@@ -1,5 +1,5 @@
 // Electron main process: one window, the backend behind IPC.
-import { app, BrowserWindow, dialog, ipcMain, shell, Menu } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell, Menu, session, type MenuItemConstructorOptions } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Backend } from '../backend/backend';
@@ -13,6 +13,10 @@ const backend = new Backend(app.getPath('userData'), {
     return r.canceled ? null : r.filePaths[0];
   },
   revealPath: (p) => shell.showItemInFolder(p),
+  // Names of people, places and topics are never marked as misspelled.
+  onVaultOpened: (words) => {
+    for (const w of words) session.defaultSession.addWordToSpellCheckerDictionary(w);
+  },
 });
 
 async function createWindow() {
@@ -28,7 +32,22 @@ async function createWindow() {
       preload: path.join(here, '../preload/index.mjs'),
       contextIsolation: true,
       sandbox: false,
+      spellcheck: true,
     },
+  });
+  // Right-click: spelling suggestions, add to dictionary, and the usual edit commands.
+  win.webContents.on('context-menu', (_e, params) => {
+    const items: MenuItemConstructorOptions[] = [];
+    if (params.misspelledWord) {
+      for (const s of params.dictionarySuggestions.slice(0, 6)) items.push({ label: s, click: () => win?.webContents.replaceMisspelling(s) });
+      if (!params.dictionarySuggestions.length) items.push({ label: 'No suggestions', enabled: false });
+      items.push({ label: `Add “${params.misspelledWord}” to dictionary`, click: () => session.defaultSession.addWordToSpellCheckerDictionary(params.misspelledWord) });
+      items.push({ type: 'separator' });
+    }
+    if (params.isEditable || params.selectionText) {
+      items.push({ role: 'cut', enabled: params.editFlags.canCut }, { role: 'copy', enabled: params.editFlags.canCopy }, { role: 'paste', enabled: params.editFlags.canPaste }, { type: 'separator' }, { role: 'selectAll' });
+    }
+    if (items.length) Menu.buildFromTemplate(items).popup({ window: win! });
   });
   // Links in writing open in the system browser, never inside the app.
   win.webContents.setWindowOpenHandler(({ url }) => {
