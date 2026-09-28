@@ -13,6 +13,86 @@ const f = (key: string, label: string, kind: FieldDef['kind'] = 'text', extra: P
 const people = (key: string, label: string, inverse: string, one = false): FieldDef =>
   one ? f(key, label, 'entity', { inverse }) : f(key, label, 'list', { of: 'entity', inverse });
 
+/** Worldbuilding types shared by the fantasy pack and "add a type" in any project. */
+export const WORLD_TEMPLATES: TemplateDef[] = [
+  {
+    id: 'settlement',
+    name: 'Settlement',
+    extends: 'place',
+    folder: 'settlements',
+    color: '#5b8a3a',
+    fields: [
+      f('size', 'Size (hamlet, village, town, city)'),
+      f('population', 'Population', 'number'),
+      f('founded', 'Founded', 'date'),
+      f('ruler', 'Ruler', 'entity'),
+      f('nation', 'Nation', 'entity', { entityType: 'faction' }),
+      f('trade', 'Trade goods', 'list', { of: 'text' }),
+    ],
+    sections: ['Overview', 'History', 'Districts', 'People', 'Economy', 'Events here'],
+  },
+  {
+    id: 'species',
+    name: 'Species',
+    folder: 'species',
+    color: '#1f7a8c',
+    fields: [
+      f('classification', 'Classification'),
+      f('lifespan', 'Lifespan'),
+      f('habitat', 'Habitat', 'list', { of: 'entity' }),
+      f('diet', 'Diet'),
+      f('intelligence', 'Intelligence'),
+      f('related_species', 'Related species', 'list', { of: 'entity', inverse: 'related_species' }),
+    ],
+    sections: ['Description', 'Biology', 'Behaviour', 'Habitat', 'Lore'],
+  },
+  {
+    id: 'flora',
+    name: 'Flora',
+    folder: 'flora',
+    color: '#4e9a3f',
+    fields: [
+      f('kind', 'Kind (tree, herb, fungus…)'),
+      f('habitat', 'Habitat', 'list', { of: 'entity' }),
+      f('season', 'Season'),
+      f('uses', 'Uses', 'list', { of: 'text' }),
+      f('toxicity', 'Toxicity'),
+      f('eaten_by', 'Eaten by', 'list', { of: 'entity', inverse: 'eats' }),
+    ],
+    sections: ['Description', 'Habitat', 'Uses', 'Lore'],
+  },
+  {
+    id: 'fauna',
+    name: 'Fauna',
+    folder: 'fauna',
+    color: '#a0632b',
+    fields: [
+      f('kind', 'Kind (beast, bird, fish…)'),
+      f('habitat', 'Habitat', 'list', { of: 'entity' }),
+      f('size', 'Size'),
+      f('temperament', 'Temperament'),
+      f('domesticated', 'Domesticated', 'bool'),
+      f('eats', 'Eats', 'list', { of: 'entity', inverse: 'eaten_by' }),
+      f('eaten_by', 'Eaten by', 'list', { of: 'entity', inverse: 'eats' }),
+    ],
+    sections: ['Description', 'Behaviour', 'Habitat', 'Uses', 'Lore'],
+  },
+  {
+    id: 'technology',
+    name: 'Technology',
+    folder: 'technology',
+    color: '#6b6fb3',
+    fields: [
+      f('discovered', 'Discovered', 'date'),
+      f('inventor', 'Inventor', 'entity'),
+      f('field', 'Field'),
+      f('requires', 'Requires', 'list', { of: 'entity', inverse: 'leads_to' }),
+      f('leads_to', 'Leads to', 'list', { of: 'entity', inverse: 'requires' }),
+    ],
+    sections: ['Description', 'History', 'Uses', 'Spread'],
+  },
+];
+
 /** Family and friendship facts, linked both ways (spec 5: "entity-link fields are two-way"). */
 export const FAMILY_FIELDS: FieldDef[] = [
   people('father', 'Father', 'children', true),
@@ -231,8 +311,11 @@ const fantasyTemplates: TemplateDef[] = [
       f('founded', 'Founded', 'date'),
       f('leader', 'Leader', 'entity'),
       f('capital', 'Capital', 'entity', { entityType: 'place' }),
-      f('allies', 'Allies', 'list', { of: 'entity' }),
-      f('enemies', 'Enemies', 'list', { of: 'entity' }),
+      f('allies', 'Allies', 'list', { of: 'entity', inverse: 'allies' }),
+      f('enemies', 'Enemies', 'list', { of: 'entity', inverse: 'enemies' }),
+      f('rivals', 'Rivals', 'list', { of: 'entity', inverse: 'rivals' }),
+      f('overlord', 'Overlord', 'entity', { inverse: 'vassals' }),
+      f('vassals', 'Vassals', 'list', { of: 'entity', inverse: 'overlord' }),
     ],
     sections: ['History', 'Beliefs', 'Members', 'Wars'],
   },
@@ -246,12 +329,19 @@ const fantasyTemplates: TemplateDef[] = [
   },
   {
     id: 'race',
-    name: 'Race / Species',
+    name: 'Race',
     folder: 'races',
     color: '#2f7d6d',
-    fields: [f('lifespan', 'Lifespan'), f('homeland', 'Homeland', 'entity', { entityType: 'place' })],
-    sections: ['Biology', 'Culture', 'Notable members'],
+    fields: [
+      f('lifespan', 'Lifespan'),
+      f('homeland', 'Homeland', 'entity', { entityType: 'place' }),
+      f('species', 'Species', 'entity', { entityType: 'species' }),
+      f('languages', 'Languages', 'list', { of: 'text' }),
+      f('related_races', 'Related races', 'list', { of: 'entity', inverse: 'related_races' }),
+    ],
+    sections: ['Appearance', 'Biology', 'Culture', 'History', 'Notable members'],
   },
+  ...WORLD_TEMPLATES,
   {
     id: 'item',
     name: 'Item / Artifact',

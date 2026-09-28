@@ -191,3 +191,24 @@ export interface DocFormat {
   align?: 'left' | 'justify';
   width?: 'narrow' | 'normal' | 'wide';
 }
+
+export type ViewKind = 'timeline' | 'family' | 'lineage' | 'tech' | 'radial' | 'web';
+
+/** A saved timeline or chart (views/<id>.yaml). It stores settings, never content. */
+export interface ViewDef {
+  id: string;
+  name: string;
+  kind: ViewKind;
+  /** Centre of a radial chart, or the person a family tree starts from. */
+  root?: string;
+  /** How many steps out from the root. */
+  depth?: number;
+  /** Lineage trees: which kind of link to follow (teacher, parent, overlord, leads_to, or a relationship id). */
+  relation?: string;
+  /** Only these relationship categories (radial / web). */
+  categories?: string[];
+  /** Only entities of these types. */
+  types?: string[];
+  /** Timelines: one lane per type, or one per entity. */
+  lanes?: 'type' | 'entity';
+}

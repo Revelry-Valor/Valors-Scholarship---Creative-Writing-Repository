@@ -31,6 +31,19 @@ On first launch you get the **project picker**: create a vault from a starter pa
 | Click a paragraph on a profile | Edit it in place — the change is saved to the entry it lives in and appears everywhere |
 | Delete a paragraph that is on other pages | "This block appears on 3 pages" — delete everywhere, I'm moving it, or restore |
 
+**Timelines & Trees** (sidebar) are saved charts drawn from what you wrote — never typed by hand:
+
+| Chart | Drawn from |
+| --- | --- |
+| Timeline | every date: born/died life spans, dated facts, `{year: …}` paragraphs; lanes per type or per entity |
+| Family tree | `{father: @…}`, `{mother: @…}`, `{children: @A, @B}`, `{spouse: @…}`, `>parent_of>`; spouses side by side |
+| Lineage tree | any chain: teacher → student, overlord → vassal, food chain, or any relationship type |
+| Tech tree | Technology pages' `requires` / `leads to` facts |
+| Radial chart | one nation or person in the centre, everyone linked to them around it, coloured by kind; one-sided feelings are two arrows |
+| Relationship web | everyone of the chosen types on a circle, with who is what to whom |
+
+Types available to any project (⊕ next to Entities): Settlement, Race, Species, Flora, Fauna, Technology, plus every starter type and your own. Family, allies/enemies, vassals, predator/prey and requires/leads-to facts are two-way.
+
 The coloured **context stripe** in the left margin shows, for every paragraph, which profiles it will be filed to (one colour per entity; hover for names). The **This block** panel on the right spells it out and offers one-click fixes for broken markup.
 
 **Keys:** `Ctrl+O` go to anything · `Ctrl+K` commands · `Ctrl+N` new document · `Ctrl+Shift+E` new entity · `Ctrl+Shift+F` search · `F1` markup reference (pinnable) · `Ctrl+E` raw markup · `Ctrl+Enter` / `Ctrl+click` open the chip under the cursor · `Ctrl+\` right panel · `Ctrl+W` / `Ctrl+Tab` tabs. Everything is reachable without the mouse.
@@ -68,7 +81,8 @@ tests/           markup unit tests + spec acceptance tests
 Scholarship/
   entries/            your writing; nested folders, and "Chapter 1.md" + "Chapter 1/" for sub-documents
   entities/people/    one .md per entity: frontmatter (id, type, name, aliases, fields) + notes written on the profile
-  templates/          one .yaml per type — edit these to add fields and sections
+  templates/          one .yaml per type — edit these (or use the template editor) to add facts and sections
+  views/              saved timelines and trees (settings only)
   relations.yaml      relationship types with inverse labels and categories
   settings.yaml       vault settings (default type, last used type, …)
   binder.yaml         manual order of the binder

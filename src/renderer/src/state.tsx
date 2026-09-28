@@ -9,7 +9,8 @@ import type { BackendEvent } from '../../backend/backend';
 export type Tab =
   | { key: string; kind: 'entry'; id: string; focusBlock?: string }
   | { key: string; kind: 'entity'; id: string; focusBlock?: string }
-  | { key: string; kind: 'search'; query: string };
+  | { key: string; kind: 'search'; query: string }
+  | { key: string; kind: 'view'; id: string };
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 export type TabInput = DistributiveOmit<Tab, 'key'>;

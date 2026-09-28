@@ -12,6 +12,8 @@ import { useDialogs } from './Dialogs';
 import { applyTheme, currentTheme, type Theme } from '../theme';
 import { ContextMenu, type MenuSpec } from './Menu';
 import { TemplateEditor } from './TemplateEditor';
+import { ViewPage } from '../charts/ViewPage';
+import { newView, addType } from './ViewsSidebar';
 
 export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
   const app = useApp();
@@ -83,6 +85,8 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
       { id: 'raw', label: app.rawMarkup ? 'Show chips (hide raw markup)' : 'Show raw markup', hint: 'Ctrl+E', run: () => app.setRawMarkup(!app.rawMarkup) },
       { id: 'close-tab', label: 'Close tab', hint: 'Ctrl+W', run: () => app.active && app.closeTab(app.active) },
       { id: 'theme', label: `Theme: ${theme} → ${theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system'}`, run: cycleTheme },
+      { id: 'new-view', label: 'New timeline or tree (family, lineage, tech, radial, web)…', run: () => newView(app, dialogs) },
+      { id: 'add-type', label: 'Add a type (Settlement, Race, Species, Flora, Fauna, Technology…)', run: () => addType(app, dialogs) },
       {
         id: 'template',
         label: 'Edit a template (facts and sections)…',
@@ -176,6 +180,7 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
   const tabTitle = (t: Tab) => {
     if (t.kind === 'entity') return app.entityById.get(t.id)?.name ?? '…';
     if (t.kind === 'search') return 'Search';
+    if (t.kind === 'view') return <ViewTitle id={t.id} />;
     return null;
   };
 
@@ -247,6 +252,7 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
           {activeTab?.kind === 'entry' && <EntryView key={activeTab.key} id={activeTab.id} focusBlock={activeTab.focusBlock} />}
           {activeTab?.kind === 'entity' && <ProfileView key={activeTab.key} id={activeTab.id} focusBlock={activeTab.focusBlock} />}
           {activeTab?.kind === 'search' && <SearchView query={activeTab.query} />}
+          {activeTab?.kind === 'view' && <ViewPage key={activeTab.key} id={activeTab.id} />}
           {!activeTab && <Welcome onNewEntry={newEntry} onNewEntity={() => newEntity()} onGoto={() => setPalette('switch')} />}
         </div>
       </div>
@@ -263,6 +269,15 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
       </div>
     </div>
   );
+}
+
+function ViewTitle({ id }: { id: string }) {
+  const app = useApp();
+  const [name, setName] = useState('…');
+  useEffect(() => {
+    api.listViews().then((vs) => setName(vs.find((v) => v.id === id)?.name ?? '(deleted)'));
+  }, [id, app.version]);
+  return <>{name}</>;
 }
 
 function EntryTitle({ id }: { id: string }) {

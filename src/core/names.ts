@@ -46,7 +46,8 @@ export class NameTable implements NameResolver {
   matchPrefix(text: string): string | null {
     const m = /^[\p{L}\p{N}_'’-]+/u.exec(text);
     if (!m) return null;
-    const first = normalizeName(m[0]);
+    // "Deep-sea" normalises to "deep sea"; names are indexed by their first word.
+    const first = normalizeName(m[0]).split(' ')[0];
     const cands = this.prefixes.get(first);
     if (!cands) return null;
     const lower = text.toLowerCase();

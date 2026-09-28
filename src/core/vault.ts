@@ -32,7 +32,7 @@ import {
 import { countWords, formatTag, normalizeName, plainText, tokenize, type TagToken } from './markup';
 import { MetaStore } from './meta';
 import { NameTable } from './names';
-import { colorFor, fallbackTemplate, resolveTemplates, STARTER_PACKS, type StarterPack } from './templates';
+import { colorFor, fallbackTemplate, resolveTemplates, STARTER_PACKS, WORLD_TEMPLATES, type StarterPack } from './templates';
 import type {
   BinderNode,
   BlockRecord,
@@ -46,6 +46,8 @@ import type {
   ResolvedTemplate,
   TemplateDef,
   VaultSettings,
+  ViewDef,
+  ViewKind,
 } from './types';
 
 export const VAULT_MARKER = 'settings.yaml';
@@ -120,7 +122,7 @@ export class Vault {
     if (!pack) throw new Error(`Unknown starter pack ${String(opts.pack)}`);
     if (Vault.isVault(root)) throw new Error('That folder already contains a vault.');
     await fs.mkdir(root, { recursive: true });
-    for (const d of ['entries', 'entities', 'library', 'templates', 'attachments', '.meta']) await fs.mkdir(path.join(root, d), { recursive: true });
+    for (const d of ['entries', 'entities', 'library', 'templates', 'attachments', 'views', '.meta']) await fs.mkdir(path.join(root, d), { recursive: true });
     for (const t of pack.templates) {
       await fs.writeFile(path.join(root, 'templates', `${t.id}.yaml`), YAML.stringify(t, { lineWidth: 0 }));
     }
@@ -838,6 +840,86 @@ export class Vault {
     });
   }
 
+  /** Types you can add to this project: every starter type it doesn't have yet. */
+  availableTemplates(): Array<{ id: string; name: string; from: string; fields: number; sections: string[] }> {
+    const have = new Set(this.templateDefs.map((t) => t.id));
+    const out = new Map<string, { id: string; name: string; from: string; fields: number; sections: string[] }>();
+    for (const t of WORLD_TEMPLATES) if (!have.has(t.id)) out.set(t.id, { id: t.id, name: t.name, from: 'Worldbuilding', fields: t.fields.length, sections: t.sections });
+    for (const p of STARTER_PACKS) {
+      for (const t of p.templates) if (!have.has(t.id) && !out.has(t.id)) out.set(t.id, { id: t.id, name: t.name, from: p.name, fields: t.fields.length, sections: t.sections });
+    }
+    return [...out.values()];
+  }
+
+  /** Add a starter type to this project, or a new empty one when `id` isn't a starter type. */
+  addTemplate(opts: { id?: string; name?: string }) {
+    return this.exclusive(async () => {
+      const all = [...WORLD_TEMPLATES, ...STARTER_PACKS.flatMap((p) => p.templates)];
+      let def = opts.id ? all.find((t) => t.id === opts.id) : undefined;
+      if (!def) {
+        const name = (opts.name ?? '').trim();
+        if (!name) throw new Error('A new type needs a name');
+        const id = slugify(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'type';
+        if (this.templateDefs.some((t) => t.id === id)) throw new Error(`There is already a type called ${name}`);
+        def = { id, name, folder: id, fields: [], sections: ['Overview', 'History', 'Notes'] };
+      } else if (this.templateDefs.some((t) => t.id === def!.id)) {
+        throw new Error(`This project already has ${def.name}`);
+      }
+      // A starter type whose parent is missing stands on its own.
+      const clean = { ...def, extends: def.extends && this.templateDefs.some((t) => t.id === def!.extends) ? def.extends : undefined };
+      await this.writeRel(`templates/${clean.id}.yaml`, YAML.stringify(clean, { lineWidth: 0 }));
+      await this.loadConfig();
+      this.analyzeAll();
+      this.emit({ files: [`templates/${clean.id}.yaml`], entities: true });
+      return this.template(clean.id);
+    });
+  }
+
+  // ---------------------------------------------------------------- saved views (trees, timelines)
+
+  async listViews(): Promise<ViewDef[]> {
+    const out: ViewDef[] = [];
+    for (const f of await fs.readdir(this.abs('views')).catch(() => [] as string[])) {
+      if (!f.endsWith('.yaml')) continue;
+      try {
+        const def = YAML.parse(await this.readRel(`views/${f}`)) as ViewDef;
+        out.push({ ...def, id: f.slice(0, -5) });
+      } catch {
+        // skip unreadable view files
+      }
+    }
+    return out.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  createView(opts: { name: string; kind: ViewKind; root?: string; relation?: string }) {
+    return this.exclusive(async () => {
+      const base = slugify(opts.name || 'View');
+      let id = base;
+      for (let n = 2; existsSync(this.abs(`views/${id}.yaml`)); n++) id = `${base} ${n}`;
+      const def: ViewDef = { id, name: opts.name || 'View', kind: opts.kind, root: opts.root, relation: opts.relation, depth: opts.kind === 'radial' ? 1 : undefined };
+      await this.writeRel(`views/${id}.yaml`, YAML.stringify(def));
+      this.emit({ files: [`views/${id}.yaml`], entities: false, binder: true });
+      return def;
+    });
+  }
+
+  saveView(def: ViewDef) {
+    return this.exclusive(async () => {
+      if (!existsSync(this.abs(`views/${def.id}.yaml`))) throw new Error('That view no longer exists');
+      const clean = Object.fromEntries(Object.entries(def).filter(([, x]) => x !== undefined && x !== ''));
+      await this.writeRel(`views/${def.id}.yaml`, YAML.stringify(clean));
+      this.emit({ files: [`views/${def.id}.yaml`], entities: false, binder: true });
+      return def;
+    });
+  }
+
+  deleteView(id: string) {
+    return this.exclusive(async () => {
+      await this.toTrash(`views/${id}.yaml`);
+      this.emit({ files: [`views/${id}.yaml`], entities: false, binder: true });
+    });
+  }
+
   rawTemplate(id: string): TemplateDef {
     const def = this.templateDefs.find((t) => t.id === id);
     if (!def) throw new Error(`No template ${id}`);
@@ -871,6 +953,11 @@ export class Vault {
         mine.fields = [...(mine.fields ?? []), ...newFields];
         await this.writeRel(`templates/${mine.id}.yaml`, YAML.stringify(mine, { lineWidth: 0 }));
         added.push(...newFields.map((f) => `${mine.name}: ${f.label}`));
+      }
+      for (const starter of pack.templates) {
+        if (this.templateDefs.some((t) => t.id === starter.id)) continue;
+        await this.writeRel(`templates/${starter.id}.yaml`, YAML.stringify(starter, { lineWidth: 0 }));
+        added.push(`New type: ${starter.name}`);
       }
       const relIds = new Set(this.relationTypes.keys());
       const newRels = pack.relations.filter((r) => !relIds.has(r.id));

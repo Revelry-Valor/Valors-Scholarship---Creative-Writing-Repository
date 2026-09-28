@@ -24,6 +24,11 @@ describe('tag tokenizer', () => {
     expect(tags('@Council of Nicaea met')[0].name).toBe('Council of Nicaea');
   });
 
+  it('matches known names that contain hyphens', () => {
+    const t = new NameTable([{ id: 'e-9', name: 'Deep-sea navigation', aliases: [] }]);
+    expect(tags('@Deep-sea navigation made it possible', t)[0].name).toBe('Deep-sea navigation');
+  });
+
   it('shrinks a run to the part that resolves', () => {
     expect(tags('@Pineapple Then he left')[0].name).toBe('Pineapple');
   });

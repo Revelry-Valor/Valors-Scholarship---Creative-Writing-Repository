@@ -9,7 +9,8 @@ import { watch, type FSWatcher } from 'chokidar';
 import { Vault, type BinderParent, type ChangeEvent } from '../core/vault';
 import { buildProfile, blockView, quickSwitch, searchBlocks, type SearchFilters } from '../core/views';
 import { STARTER_PACKS } from '../core/templates';
-import type { EntryStatus, TemplateDef } from '../core/types';
+import type { EntryStatus, TemplateDef, ViewDef } from '../core/types';
+import { buildGraph, buildTimeline } from '../core/graph';
 
 export interface RecentVault {
   path: string;
@@ -145,6 +146,14 @@ export class Backend {
     getTemplate: async (id: string) => this.v().rawTemplate(id),
     saveTemplate: async (def: TemplateDef) => this.v().saveTemplate(def),
     upgradeTemplates: async () => this.v().upgradeTemplates(),
+    availableTemplates: async () => this.v().availableTemplates(),
+    addTemplate: async (opts: { id?: string; name?: string }) => this.v().addTemplate(opts),
+    listViews: async () => this.v().listViews(),
+    createView: async (opts: Parameters<Vault['createView']>[0]) => this.v().createView(opts),
+    saveView: async (def: ViewDef) => this.v().saveView(def),
+    deleteView: async (id: string) => this.v().deleteView(id),
+    graph: async () => buildGraph(this.v()),
+    timeline: async () => buildTimeline(this.v()),
     getEntityNotes: async (id: string) => {
       const e = this.v().entities.get(id);
       if (!e) throw new Error(`No entity ${id}`);

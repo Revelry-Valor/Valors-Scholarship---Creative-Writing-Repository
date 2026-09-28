@@ -5,6 +5,7 @@ import { useApp } from '../state';
 import { useDialogs } from './Dialogs';
 import { ContextMenu, type MenuSpec } from './Menu';
 import { STATUSES } from './EntryView';
+import { ViewsSection, addType } from './ViewsSidebar';
 import type { BinderNode, EntryStatus } from '../../../core/types';
 
 type Parent = { kind: 'root' } | { kind: 'folder'; path: string } | { kind: 'entry'; id: string };
@@ -349,9 +350,14 @@ export function Sidebar({ onSwitchVault }: { onSwitchVault: () => void }) {
         </ul>
       </div>
 
+      <ViewsSection />
+
       <div className="side-section grow">
         <div className="side-head">
           <span>Entities</span>
+          <button className="icon-btn" title="Add a type (Settlement, Flora, Fauna…)" onClick={() => addType(app, dialogs)}>
+            ⊕
+          </button>
           <button className="icon-btn" title="New entity (Ctrl+Shift+E)" onClick={() => newEntity()}>
             +
           </button>
