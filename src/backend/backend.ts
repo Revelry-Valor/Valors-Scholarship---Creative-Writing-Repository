@@ -9,7 +9,7 @@ import { watch, type FSWatcher } from 'chokidar';
 import { Vault, type BinderParent, type ChangeEvent } from '../core/vault';
 import { buildProfile, blockView, quickSwitch, searchBlocks, type SearchFilters } from '../core/views';
 import { STARTER_PACKS } from '../core/templates';
-import type { EntryStatus } from '../core/types';
+import type { EntryStatus, TemplateDef } from '../core/types';
 
 export interface RecentVault {
   path: string;
@@ -141,6 +141,10 @@ export class Backend {
     renameEntity: async (id: string, name: string) => this.v().renameEntity(id, name),
     deleteEntity: async (id: string) => this.v().deleteEntity(id),
     profile: async (id: string) => buildProfile(this.v(), id),
+    ensureSkeleton: async (id: string) => this.v().ensureSkeleton(id),
+    getTemplate: async (id: string) => this.v().rawTemplate(id),
+    saveTemplate: async (def: TemplateDef) => this.v().saveTemplate(def),
+    upgradeTemplates: async () => this.v().upgradeTemplates(),
     getEntityNotes: async (id: string) => {
       const e = this.v().entities.get(id);
       if (!e) throw new Error(`No entity ${id}`);

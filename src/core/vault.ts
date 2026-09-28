@@ -388,7 +388,9 @@ export class Vault {
       if (seen.has(key) || this.names.resolve(p.name).status !== 'missing') continue;
       seen.add(key);
       const type = p.via === 'topic' ? this.topicType() : this.settings.lastUsedType ?? this.settings.defaultEntityType;
-      const e = await this.writeNewEntity(p.name, type);
+      // "#grace-and-repentance" creates the topic "Grace and repentance".
+      const name = p.via === 'topic' ? p.name.charAt(0).toUpperCase() + p.name.slice(1) : p.name;
+      const e = await this.writeNewEntity(name, type);
       created.push(e.id);
     }
     if (created.length) {
@@ -771,9 +773,119 @@ export class Vault {
     };
     if (extra.summary) fm.summary = extra.summary;
     fm.fields = {};
-    await this.writeRel(rel, stringifyFile(fm, ''));
+    fm.skeleton = true;
+    const body = this.skeletonFor(tpl, '');
+    await this.writeRel(rel, stringifyFile(fm, body));
     await this.loadEntityFile(rel);
+    await this.ensureBlockIds(rel);
     return this.entities.get(id)!;
+  }
+
+  /** The template's sections as headings, like the blank pages of a document template. */
+  private skeletonFor(tpl: ResolvedTemplate, body: string): string {
+    const have = new Set(
+      splitBlocks(body)
+        .filter((b) => b.kind === 'heading')
+        .map((b) => plainText(b.text).toLowerCase()),
+    );
+    const missing = tpl.sections.filter((sec) => sec !== 'Summary' && !have.has(sec.toLowerCase()));
+    if (!missing.length) return body;
+    const add = missing.map((sec) => `## ${sec}`).join('\n\n');
+    return body.trim() ? `${body.trimEnd()}\n\n${add}\n` : `${add}\n`;
+  }
+
+  /**
+   * Give an older profile its template headings once, so it opens as a document.
+   * Afterwards the headings are yours: delete or add them freely.
+   */
+  ensureSkeleton(id: string) {
+    return this.exclusive(async () => {
+      const e = this.entities.get(id);
+      if (!e) throw new Error(`No entity ${id}`);
+      const st = this.files.get(e.file)!;
+      if (st.frontmatter.skeleton) return false;
+      st.frontmatter.skeleton = true;
+      const body = this.skeletonFor(this.template(e.type), st.body);
+      await this.writeRel(e.file, stringifyFile(st.frontmatter, body));
+      st.body = body;
+      st.blocks = splitBlocks(body);
+      await this.ensureBlockIds(e.file);
+      this.analyzeFile(e.file);
+      await this.meta.flush();
+      this.emit({ files: [e.file], entities: false });
+      return true;
+    });
+  }
+
+  // ---------------------------------------------------------------- templates
+
+  /** Save an edited type definition (fields and sections) back to templates/<id>.yaml. */
+  saveTemplate(def: TemplateDef) {
+    return this.exclusive(async () => {
+      if (!def.id || !/^[a-z0-9][a-z0-9-]*$/.test(def.id)) throw new Error('A template id uses lowercase letters, digits and dashes');
+      if (!def.name?.trim()) throw new Error('A template needs a name');
+      const clean: TemplateDef = {
+        ...def,
+        fields: (def.fields ?? []).filter((f) => f.key && f.label),
+        sections: (def.sections ?? []).map((x) => x.trim()).filter(Boolean),
+      };
+      await this.writeRel(`templates/${def.id}.yaml`, YAML.stringify(clean, { lineWidth: 0 }));
+      await this.loadConfig();
+      this.analyzeAll();
+      await this.meta.flush();
+      this.emit({ files: [`templates/${def.id}.yaml`], entities: true });
+      return this.template(def.id);
+    });
+  }
+
+  rawTemplate(id: string): TemplateDef {
+    const def = this.templateDefs.find((t) => t.id === id);
+    if (!def) throw new Error(`No template ${id}`);
+    return def;
+  }
+
+  /**
+   * Bring in fields, sections and relationship types that newer starter packs added,
+   * without removing or changing anything you edited. Returns what was added.
+   */
+  upgradeTemplates() {
+    return this.exclusive(async () => {
+      const pack = STARTER_PACKS.find((p) => p.id === this.settings.mode);
+      const added: string[] = [];
+      if (!pack) return added;
+      for (const starter of pack.templates) {
+        const mine = this.templateDefs.find((t) => t.id === starter.id);
+        if (!mine) continue;
+        const keys = new Set((mine.fields ?? []).map((f) => f.key));
+        const newFields = (starter.fields ?? []).filter((f) => !keys.has(f.key));
+        // Upgrade two-way links on fields you already have.
+        let changedInverse = false;
+        for (const f of mine.fields ?? []) {
+          const sf = starter.fields.find((x) => x.key === f.key);
+          if (sf?.inverse && !f.inverse) {
+            f.inverse = sf.inverse;
+            changedInverse = true;
+          }
+        }
+        if (!newFields.length && !changedInverse) continue;
+        mine.fields = [...(mine.fields ?? []), ...newFields];
+        await this.writeRel(`templates/${mine.id}.yaml`, YAML.stringify(mine, { lineWidth: 0 }));
+        added.push(...newFields.map((f) => `${mine.name}: ${f.label}`));
+      }
+      const relIds = new Set(this.relationTypes.keys());
+      const newRels = pack.relations.filter((r) => !relIds.has(r.id));
+      if (newRels.length) {
+        await this.writeRel('relations.yaml', YAML.stringify([...this.relationTypes.values(), ...newRels], { lineWidth: 0 }));
+        added.push(...newRels.map((r) => `Relationship: ${r.label}`));
+      }
+      if (added.length) {
+        await this.loadConfig();
+        this.analyzeAll();
+        await this.meta.flush();
+        this.emit({ files: [], entities: true });
+      }
+      return added;
+    });
   }
 
   createEntity(opts: { name: string; type: string; aliases?: string[]; summary?: string }) {

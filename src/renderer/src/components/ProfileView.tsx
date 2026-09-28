@@ -1,13 +1,21 @@
-// A profile is a live view (spec 8): header, fact box, template sections filled
-// with the blocks tagged into them, relationships, a timeline strip, mentions.
-// Every block is stored once; editing it here edits it everywhere.
-import { useEffect, useMemo, useRef, useState } from 'react';
+// A profile is a document (spec 8, and a word-processor page): the template's sections
+// are ordinary headings you write under, and paragraphs written in other documents appear
+// live under their heading, grouped by the document they came from. Facts, the timeline
+// and relationships sit beside the page.
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import type { EditorView } from '@codemirror/view';
 import { api, type ApiResult } from '../api';
 import { useApp } from '../state';
 import { BlockText } from './BlockText';
 import { Editor } from '../editor/Editor';
+import { elsewhereExtension, setElsewhere, slotKey } from '../editor/elsewhere';
 import { useDialogs } from './Dialogs';
-import type { BlockView, FactView } from '../../../core/views';
+import { FormatBar, formatStyle, loadDefaultFormat } from './FormatBar';
+import { TemplateEditor } from './TemplateEditor';
+import type { BlockView, FactView, SourceGroup } from '../../../core/views';
+import type { DocFormat } from '../../../core/types';
+import { FAMILY_FIELDS } from '../../../core/templates';
 import { formatSort } from '../../../core/dates';
 
 type Profile = ApiResult<'profile'>;
@@ -20,14 +28,19 @@ const VIA_LABEL: Record<string, string> = {
   link: 'linked',
 };
 
+const FAMILY_KEYS = new Set(FAMILY_FIELDS.map((f) => f.key));
+
 export function ProfileView({ id, focusBlock }: { id: string; focusBlock?: string }) {
   const app = useApp();
   const dialogs = useDialogs();
   const [p, setP] = useState<Profile | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showNotes, setShowNotes] = useState(false);
+  const [view, setView] = useState<EditorView | null>(null);
+  const [tick, setTick] = useState(0);
+  const [format, setFormat] = useState<Required<DocFormat>>(loadDefaultFormat);
+  const [showEmpty, setShowEmpty] = useState(false);
 
-  const load = () =>
+  useEffect(() => {
     api
       .profile(id)
       .then((x) => {
@@ -35,10 +48,6 @@ export function ProfileView({ id, focusBlock }: { id: string; focusBlock?: strin
         setError(null);
       })
       .catch((e) => setError((e as Error).message));
-
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, app.version]);
 
   useEffect(() => {
@@ -76,10 +85,12 @@ export function ProfileView({ id, focusBlock }: { id: string; focusBlock?: strin
     await app.refreshNames();
   };
 
+  const editTemplate = () => dialogs.show((close) => <TemplateEditor typeId={e.type} onClose={() => close(null)} />);
+
   const deleteEntity = async () => {
     const ok = await dialogs.choose({
       title: `Delete ${e.name}?`,
-      message: <p>The profile file moves to the vault's .trash folder. Blocks you wrote stay in their entries; their tags to {e.name} will show as broken until you re-create or remove them.</p>,
+      message: <p>The profile file moves to the vault's .trash folder. Paragraphs you wrote elsewhere stay where they are; their tags to {e.name} will show as broken until you re-create or remove them.</p>,
       choices: [
         { label: 'Delete profile', value: true, kind: 'danger' },
         { label: 'Cancel', value: false, kind: 'primary' },
@@ -91,59 +102,68 @@ export function ProfileView({ id, focusBlock }: { id: string; focusBlock?: strin
     await app.refreshNames();
   };
 
-  const filledFacts = p.facts.filter((f) => f.values.length).length;
+  const changeFormat = (patch: Partial<DocFormat>) => {
+    const next = { ...format, ...patch };
+    setFormat(next);
+    try {
+      localStorage.setItem('lr.defaultFormat', JSON.stringify(next));
+    } catch {
+      // ignore
+    }
+  };
+
+  const facts = p.facts.filter((f) => !FAMILY_KEYS.has(f.key));
+  const family = p.facts.filter((f) => FAMILY_KEYS.has(f.key));
+  const filledFacts = facts.filter((f) => f.values.length).length;
 
   return (
-    <div className="profile" style={{ ['--entity' as string]: e.color }}>
-      <header className="profile-header">
-        <div className="profile-kicker">
-          <button className="type-pill" onClick={changeType} title="Change type">
-            {e.typeName}
-          </button>
-          <span className="muted">
-            {p.stats.blocks} block{p.stats.blocks === 1 ? '' : 's'} from {p.stats.sources} source{p.stats.sources === 1 ? '' : 's'}
-          </span>
-        </div>
-        <h1 className="profile-name">
-          {e.name}
-          <button className="icon-btn" onClick={rename} title="Rename (updates every tag)">
-            ✎
-          </button>
-        </h1>
-        <Aliases id={id} aliases={e.aliases} />
-        {p.pinned ? (
-          <div className="profile-summary pinned">
-            <BlockText text={p.pinned.text} />
-            <SourceLink b={p.pinned} />
-          </div>
-        ) : (
-          <Summary id={id} summary={e.summary} />
-        )}
-      </header>
-
+    <div className={`profile entry-view para-${format.paragraphs} align-${format.align}`} style={{ ['--entity' as string]: e.color, ...formatStyle(format) }}>
+      <FormatBar view={view} tick={tick} format={format} onFormat={changeFormat} focusMode={app.focusMode} onFocusMode={() => app.setFocusMode(!app.focusMode)} />
       <div className="profile-body">
-        <main className="profile-main">
-          {p.sections.map((s) => (
-            <Section key={s.name} entityId={id} name={s.name} blocks={s.blocks} />
-          ))}
-          <Section entityId={id} name="Mentions" blocks={p.mentions} hint="Tagged here without a section. Add ::Section to a tag, or put it under a matching heading, to file it." />
+        <main className="profile-main doc-column page">
+          <header className="profile-header">
+            <div className="profile-kicker">
+              <button className="type-pill" onClick={changeType} title="Change type">
+                {e.typeName}
+              </button>
+              <span className="muted">
+                {p.stats.blocks} paragraph{p.stats.blocks === 1 ? '' : 's'} from {p.stats.sources} document{p.stats.sources === 1 ? '' : 's'}
+              </span>
+            </div>
+            <h1 className="profile-name">
+              {e.name}
+              <button className="icon-btn" onClick={rename} title="Rename (updates every tag)">
+                ✎
+              </button>
+            </h1>
+            <Aliases id={id} aliases={e.aliases} />
+            {p.pinned ? (
+              <div className="profile-summary pinned">
+                <BlockText text={p.pinned.text} />
+                <SourceLink b={p.pinned} />
+              </div>
+            ) : (
+              <Summary id={id} summary={e.summary} />
+            )}
+          </header>
+
+          <ProfileDocument
+            id={id}
+            p={p}
+            focusBlock={focusBlock}
+            onView={setView}
+            onUpdate={() => setTick((n) => n + 1)}
+          />
+
           {p.references.length > 0 && (
-            <section className="section">
-              <h2 className="section-title">
-                Linked from <span className="count">{p.references.length}</span>
-              </h2>
-              <p className="section-hint">Passing references with [[ ]] — not filed to this profile.</p>
+            <section className="references">
+              <h2 className="elsewhere-heading">Linked from</h2>
+              <p className="section-hint">Passing references with [[ ]] — not filed to this page.</p>
               {p.references.map((b) => (
-                <BlockCard key={b.id} b={b} entityId={id} />
+                <BlockCard key={b.id} b={b} entityId={id} flat />
               ))}
             </section>
           )}
-          <section className="section">
-            <button className="btn btn-ghost" onClick={() => setShowNotes((x) => !x)}>
-              {showNotes ? 'Hide' : 'Edit'} this profile's own file
-            </button>
-            {showNotes && <ProfileNotes id={id} />}
-          </section>
         </main>
 
         <aside className="profile-aside">
@@ -151,14 +171,35 @@ export function ProfileView({ id, focusBlock }: { id: string; focusBlock?: strin
             <div className="card-title">
               Facts
               <span className="muted">
-                {filledFacts}/{p.facts.length}
+                {filledFacts}/{facts.length}
               </span>
             </div>
-            {p.facts.map((f) => (
+            {facts.map((f) => (
               <FactRow key={f.key} entityId={id} fact={f} />
             ))}
-            {!p.facts.length && <p className="muted small">This type has no fields. Add some to its template.</p>}
+            {!facts.length && <p className="muted small">This type has no fields yet.</p>}
           </div>
+
+          {family.length > 0 && (
+            <div className="card facts">
+              <div className="card-title">
+                Family & friends
+                <button className="linkish small" onClick={() => setShowEmpty((x) => !x)}>
+                  {showEmpty ? 'hide empty' : 'add…'}
+                </button>
+              </div>
+              {family
+                .filter((f) => showEmpty || f.values.length)
+                .map((f) => (
+                  <FactRow key={f.key} entityId={id} fact={f} />
+                ))}
+              {!family.some((f) => f.values.length) && !showEmpty && (
+                <p className="muted small">
+                  None yet. Write <code>{'{mother: @Name}'}</code> after a tag, or choose “add…”.
+                </p>
+              )}
+            </div>
+          )}
 
           {p.timeline.length > 0 && <TimelineStrip items={p.timeline} />}
 
@@ -166,7 +207,7 @@ export function ProfileView({ id, focusBlock }: { id: string; focusBlock?: strin
             <div className="card-title">Relationships</div>
             {p.relations.length === 0 && (
               <p className="muted small">
-                None yet. Write <code>@{e.name.split(' ').pop()} &gt;relation&gt; @Someone</code> in any entry.
+                None yet. Write <code>@{e.name.split(' ').pop()} &gt;relation&gt; @Someone</code> in any document.
               </p>
             )}
             {p.relations.map((g) => (
@@ -188,13 +229,115 @@ export function ProfileView({ id, focusBlock }: { id: string; focusBlock?: strin
           </div>
 
           <div className="card danger-zone">
+            <button className="btn btn-ghost small" onClick={editTemplate}>
+              Edit the {e.typeName} template…
+            </button>
             <button className="btn btn-ghost small" onClick={deleteEntity}>
-              Delete profile…
+              Delete this page…
             </button>
             <span className="muted small">{e.file}</span>
           </div>
         </aside>
       </div>
+    </div>
+  );
+}
+
+/**
+ * The page itself: the entity's own file in the editor, with paragraphs from other
+ * documents shown under their section heading, grouped by document.
+ */
+function ProfileDocument({ id, p, focusBlock, onView, onUpdate }: { id: string; p: Profile; focusBlock?: string; onView: (v: EditorView | null) => void; onUpdate: () => void }) {
+  const app = useApp();
+  const [body, setBody] = useState<string | null>(null);
+  const [external, setExternal] = useState<{ body: string; version: number } | undefined>();
+  const [slots, setSlots] = useState<Map<string, HTMLElement>>(() => new Map());
+  const viewRef = useRef<EditorView | null>(null);
+  const extensions = useMemo(() => [elsewhereExtension()], []);
+
+  const register = useCallback((key: string, el: HTMLElement, alive: boolean) => {
+    setSlots((prev) => {
+      if (alive ? prev.get(key) === el : prev.get(key) !== el) return prev;
+      const next = new Map(prev);
+      if (alive) next.set(key, el);
+      else next.delete(key);
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    let live = true;
+    api
+      .ensureSkeleton(id)
+      .then(() => api.getEntityNotes(id))
+      .then((r) => live && setBody(r.body))
+      .catch((err) => app.notify((err as Error).message, 'error'));
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  useEffect(() => {
+    if (body === null) return;
+    api.getEntityNotes(id).then((r) => setExternal({ body: r.body, version: app.version }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [app.version]);
+
+  const sectionNames = p.elsewhere.map((s) => s.name).join('\u0000');
+  useEffect(() => {
+    viewRef.current?.dispatch({ effects: setElsewhere.of({ sections: p.elsewhere.map((s) => s.name), register }) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sectionNames, register, viewRef.current]);
+
+  if (body === null) return <div className="loading">Loading…</div>;
+
+  return (
+    <>
+      <Editor
+        key={id}
+        mode="document"
+        initial={body}
+        external={external}
+        directOwner={id}
+        focusBlock={focusBlock}
+        extensions={extensions}
+        placeholder="Write about them here. Headings become sections on this page."
+        onUpdate={onUpdate}
+        onReady={(h) => {
+          viewRef.current = h.view;
+          onView(h.view);
+          h.view.dispatch({ effects: setElsewhere.of({ sections: p.elsewhere.map((s) => s.name), register }) });
+        }}
+        onSave={async (text) => {
+          const res = await api.saveEntityNotes(id, text);
+          if (res.created.length) await app.refreshNames();
+          return res;
+        }}
+      />
+      {p.elsewhere.map((sec) => {
+        const el = slots.get(slotKey(sec.name));
+        return el ? createPortal(<ElsewhereGroups groups={sec.groups} entityId={id} />, el, sec.name || '-') : null;
+      })}
+    </>
+  );
+}
+
+/** Paragraphs from other documents, each document's paragraphs kept together and in order. */
+function ElsewhereGroups({ groups, entityId }: { groups: SourceGroup[]; entityId: string }) {
+  const app = useApp();
+  return (
+    <div className="elsewhere">
+      {groups.map((g) => (
+        <div key={`${g.source.kind}:${g.source.id}`} className="elsewhere-group">
+          <button className="elsewhere-source" onClick={() => app.openTab(g.source.kind === 'entry' ? { kind: 'entry', id: g.source.id } : { kind: 'entity', id: g.source.id })} title="Open this document">
+            from <em>{g.source.title}</em>
+          </button>
+          {g.blocks.map((b) => (
+            <BlockCard key={b.id} b={b} entityId={entityId} flat />
+          ))}
+        </div>
+      ))}
     </div>
   );
 }
@@ -331,6 +474,7 @@ function FactRow({ entityId, fact }: { entityId: string; fact: FactView }) {
               ) : (
                 <span onClick={v.source === 'profile' ? start : undefined}>{v.text}</span>
               )}
+              {v.via && <span className="fact-via">via {v.via}</span>}
               {v.source !== 'profile' && (
                 <button
                   className="src-link"
@@ -388,53 +532,7 @@ function TimelineStrip({ items }: { items: Array<{ sort: number; label: string; 
   );
 }
 
-function Section({ entityId, name, blocks, hint }: { entityId: string; name: string; blocks: BlockView[]; hint?: string }) {
-  const [adding, setAdding] = useState(false);
-  const app = useApp();
-  const isMentions = name === 'Mentions';
-  if (isMentions && !blocks.length) return null;
-  return (
-    <section className={`section ${blocks.length ? '' : 'section-empty'}`}>
-      <h2 className="section-title">
-        {name} {blocks.length > 0 && <span className="count">{blocks.length}</span>}
-        {!isMentions && (
-          <button className="section-add" onClick={() => setAdding(true)} title={`Write a note in ${name}`}>
-            + note
-          </button>
-        )}
-      </h2>
-      {hint && <p className="section-hint">{hint}</p>}
-      {blocks.map((b) => (
-        <BlockCard key={b.id} b={b} entityId={entityId} />
-      ))}
-      {adding && (
-        <div className="block-card editing">
-          <Editor
-            mode="block"
-            initial=""
-            directOwner={entityId}
-            autoFocus
-            placeholder={`A note for ${name}… (Ctrl+Enter to save, Esc to cancel)`}
-            onCancel={() => setAdding(false)}
-            onSave={async (text) => {
-              setAdding(false);
-              if (text.trim()) {
-                try {
-                  const res = await api.addProfileNote(entityId, name, text);
-                  if (res.created.length) await app.refreshNames();
-                } catch (err) {
-                  app.notify((err as Error).message, 'error');
-                }
-              }
-            }}
-          />
-        </div>
-      )}
-    </section>
-  );
-}
-
-export function BlockCard({ b, entityId }: { b: BlockView; entityId: string }) {
+export function BlockCard({ b, entityId, flat }: { b: BlockView; entityId: string; flat?: boolean }) {
   const app = useApp();
   const dialogs = useDialogs();
   const [editing, setEditing] = useState(false);
@@ -507,7 +605,7 @@ export function BlockCard({ b, entityId }: { b: BlockView; entityId: string }) {
   };
 
   return (
-    <article className={`block-card ${editing ? 'editing' : ''}`} data-block={b.id}>
+    <article className={`block-card ${flat ? 'flat' : ''} ${editing ? 'editing' : ''}`} data-block={b.id}>
       {editing ? (
         <Editor
           mode="block"
@@ -582,29 +680,3 @@ export function BlockCard({ b, entityId }: { b: BlockView; entityId: string }) {
   );
 }
 
-function ProfileNotes({ id }: { id: string }) {
-  const app = useApp();
-  const [body, setBody] = useState<string | null>(null);
-  useEffect(() => {
-    api.getEntityNotes(id).then((r) => setBody(r.body));
-  }, [id]);
-  if (body === null) return null;
-  return (
-    <div className="profile-notes">
-      <p className="section-hint">
-        Blocks here are filed to this profile automatically. A heading that matches a section name (e.g. <code>## Life</code>) files the notes under it into that section.
-      </p>
-      <Editor
-        mode="document"
-        initial={body}
-        directOwner={id}
-        placeholder="Write directly on this profile…"
-        onSave={async (text) => {
-          const res = await api.saveEntityNotes(id, text);
-          if (res.created.length) await app.refreshNames();
-          return res;
-        }}
-      />
-    </div>
-  );
-}

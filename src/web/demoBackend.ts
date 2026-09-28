@@ -26,6 +26,9 @@ async function seed() {
 - Open "Early Church Fathers — overview" in the binder, then open Apple Scouch's profile from the Entities list. Click a paragraph there and edit it; the change shows up in the entry.
 - Format like a word processor: the toolbar above the page has paragraph styles, fonts, text size, **bold**, *italic*, lists and ==highlights==. Ctrl+B, Ctrl+I and Ctrl+U work too. Enter starts a new paragraph; Shift+Enter breaks a line.
 - Open "Page ▾" in the toolbar for line spacing, book-style indented paragraphs, justified text and page width.
+- Open the topic "prophecies regarding the jews" under Entities. It gathers paragraphs from two documents and keeps each document's paragraphs together, in order.
+- Profiles are pages you write on: open Apple Scouch and type under "Life". Paragraphs written elsewhere appear under their heading. A heading you add becomes a new section.
+- Family facts link both ways: after a tag, type { and choose mother, children, friends… Pineapple lists Scouch as a teacher, so Scouch's page lists Pineapple as a student.
 - Press Ctrl+O to jump anywhere. "Commands ▾" and "? Guide" in the top bar list every command and all the markup.
 - Delete a whole paragraph that is filed to a profile, and you'll be asked before it disappears from those pages.
 `,
@@ -40,7 +43,7 @@ async function seed() {
 
 He taught in the northern province for most of his life, and his students remembered him as a gentle but stubborn teacher. %% check the dates in Harlow %%
 
-@Chamberlain Pineapple studied under him before breaking with his theology.
+@Chamberlain Pineapple {teachers: @Apple Scouch} studied under him before breaking with his theology.
 
 ### Pineapple's objections @Chamberlain Pineapple
 
@@ -51,6 +54,27 @@ He argued repentance must come first, citing Acts 2:38. @Chamberlain Pineapple {
 ## Later reception
 
 For a century after their deaths, few writers mentioned either man.
+`,
+  );
+  // One concept gathered from two documents (the topic page keeps each document's paragraphs together).
+  const said = await v.createEntry({ title: 'What the prophets said' });
+  await v.saveEntry(
+    said.id,
+    `## Isaiah
+
+Isaiah 53 describes a servant who is "despised and rejected", and early Christian readers took it as a prophecy of Christ. #prophecies-regarding-the-jews
+
+## Micah
+
+Micah 5:2 names Bethlehem as the birthplace of a coming ruler. #prophecies-regarding-the-jews
+`,
+  );
+  const did = await v.createEntry({ title: 'At the crucifixion' });
+  await v.saveEntry(
+    did.id,
+    `The gospel writers point back to Psalm 22 when they describe the soldiers casting lots for his clothing. #prophecies-regarding-the-jews
+
+Matthew connects the thirty pieces of silver to Zechariah 11. #prophecies-regarding-the-jews
 `,
   );
   const f = await v.createFolder({ name: 'Thesis' });
@@ -77,6 +101,8 @@ const ready = (async () => {
     }
   } else {
     await backend.restoreLastVault();
+    // Sample projects made by an earlier version get the newer starter facts.
+    if (backend.vault) await backend.methods.upgradeTemplates().catch(() => undefined);
   }
 })();
 

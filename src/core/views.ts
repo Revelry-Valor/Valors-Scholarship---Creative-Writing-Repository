@@ -34,6 +34,8 @@ export interface FactValue {
   /** 'profile' when set on the fact box, otherwise the block that set it. */
   source: 'profile' | string;
   sourceTitle?: string;
+  /** Set when the value comes from the other side of a two-way field ("Anna's mother"). */
+  via?: string;
 }
 
 export interface FactView {
@@ -63,6 +65,17 @@ export interface ProfileView {
   relations: RelationGroupView[];
   timeline: Array<{ sort: number; label: string; text: string; blockId?: string }>;
   stats: { blocks: number; sources: number };
+  /**
+   * Paragraphs written elsewhere, for the document-style profile: one entry per section
+   * (template order, then headings you added), each grouped by the document it came from
+   * and kept in that document's reading order. `name` is '' for unsectioned mentions.
+   */
+  elsewhere: Array<{ name: string; groups: SourceGroup[] }>;
+}
+
+export interface SourceGroup {
+  source: BlockView['source'];
+  blocks: BlockView[];
 }
 
 export function blockView(v: Vault, b: BlockRecord, forEntity?: string): BlockView {
@@ -129,6 +142,43 @@ function factValues(v: Vault, raw: unknown, kind: FieldKind, of?: FieldKind): Fa
   return list.map(one).filter((x): x is FactValue => !!x);
 }
 
+interface FieldLink {
+  from: string;
+  to: string;
+  field: string;
+  label: string;
+  inverse: string;
+  source: 'profile' | string;
+  sourceTitle?: string;
+}
+
+/** Every entity-to-entity link made through a two-way field, from profiles and from blocks. */
+function fieldLinks(v: Vault): FieldLink[] {
+  const out: FieldLink[] = [];
+  const defOf = (entityId: string, key: string) => v.template(v.entities.get(entityId)?.type ?? '').fields.find((f) => f.key === key);
+  for (const e of v.entities.values()) {
+    for (const [key, raw] of Object.entries(e.fields ?? {})) {
+      const def = defOf(e.id, key);
+      if (!def?.inverse) continue;
+      for (const item of Array.isArray(raw) ? raw : [raw]) {
+        if (typeof item !== 'string') continue;
+        for (const part of item.split(/\s*[,;]\s*/)) {
+          const r = v.names.resolve(part.replace(/^@+/, ''));
+          if (r.status === 'ok') out.push({ from: e.id, to: r.id, field: key, label: def.label, inverse: def.inverse, source: 'profile' });
+        }
+      }
+    }
+  }
+  for (const b of v.blocks.values()) {
+    for (const fa of b.fields) {
+      if (!fa.entityRef) continue;
+      const def = defOf(fa.entityId, fa.field);
+      if (def?.inverse) out.push({ from: fa.entityId, to: fa.entityRef, field: fa.field, label: def.label, inverse: def.inverse, source: b.id, sourceTitle: v.sourceTitle(b) });
+    }
+  }
+  return out;
+}
+
 export function buildProfile(v: Vault, entityId: string): ProfileView {
   const e = v.entities.get(entityId);
   if (!e) throw new Error(`No entity ${entityId}`);
@@ -138,6 +188,7 @@ export function buildProfile(v: Vault, entityId: string): ProfileView {
   const filed = v.blocksFiledTo(entityId).filter((b) => b.kind !== 'heading' && v.meta.get(b.id)?.status !== 'deleted');
 
   // Fact box: values typed on the profile, plus values set by {field: value} in blocks.
+  const links = fieldLinks(v);
   const facts: FactView[] = tpl.fields.map((fd) => {
     const values = factValues(v, e.fields[fd.key], fd.kind, fd.of);
     for (const b of v.blocks.values()) {
@@ -151,6 +202,13 @@ export function buildProfile(v: Vault, entityId: string): ProfileView {
           sourceTitle: v.sourceTitle(b),
         });
       }
+    }
+    // Two-way fields: someone else's {mother: @This} lists them here under Children.
+    for (const link of links) {
+      if (link.to !== entityId || link.inverse !== fd.key) continue;
+      if (values.some((x) => x.entity?.id === link.from)) continue;
+      const other = v.entities.get(link.from)!;
+      values.push({ text: other.name, entity: v.chip(other), source: link.source, sourceTitle: link.sourceTitle, via: `${other.name}'s ${link.label.toLowerCase()}` });
     }
     const distinct = new Set(values.map((x) => (x.sort !== undefined ? String(x.sort) : normalizeName(x.text))));
     const isList = fd.kind === 'list';
@@ -175,6 +233,43 @@ export function buildProfile(v: Vault, entityId: string): ProfileView {
   }
 
   const sections = [...bySection.entries()].map(([name, blocks]) => ({ name, blocks: sortBlocks(v, blocks, e.order?.[name]).map((b) => blockView(v, b, entityId)) }));
+
+  // Document-style grouping for blocks written in other files.
+  const firstWritten = new Map<string, string>();
+  for (const b of v.blocks.values()) {
+    const key = `${b.owner.kind}:${b.owner.id}`;
+    const c = v.meta.get(b.id)?.created ?? '';
+    if (!firstWritten.has(key) || c < firstWritten.get(key)!) firstWritten.set(key, c);
+  }
+  const bySectionElsewhere = new Map<string, BlockRecord[]>();
+  for (const name of [...tpl.sections, '']) bySectionElsewhere.set(name, []);
+  for (const b of filed) {
+    if (b.file === e.file) continue;
+    const f = b.filedTo.find((x) => x.entityId === entityId)!;
+    const name = f.section ?? '';
+    if (!bySectionElsewhere.has(name)) bySectionElsewhere.set(name, []);
+    bySectionElsewhere.get(name)!.push(b);
+  }
+  const elsewhere = [...bySectionElsewhere.entries()]
+    .filter(([, blocks]) => blocks.length)
+    .sort(([a], [b]) => (a === '' ? 1 : 0) - (b === '' ? 1 : 0))
+    .map(([name, blocks]) => {
+      const groups = new Map<string, BlockRecord[]>();
+      for (const b of blocks) {
+        const key = `${b.owner.kind}:${b.owner.id}`;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key)!.push(b);
+      }
+      return {
+        name,
+        groups: [...groups.entries()]
+          .sort(([a], [b]) => (firstWritten.get(a) ?? '').localeCompare(firstWritten.get(b) ?? ''))
+          .map(([, list]) => {
+            const views = list.sort((a, b) => a.position - b.position).map((b) => blockView(v, b, entityId));
+            return { source: views[0].source, blocks: views };
+          }),
+      };
+    });
 
   // Relationships, shown from both sides with the inverse label.
   const groups = new Map<string, RelationGroupView>();
@@ -225,6 +320,7 @@ export function buildProfile(v: Vault, entityId: string): ProfileView {
     relations: [...groups.values()].sort((a, b) => a.label.localeCompare(b.label)),
     timeline,
     stats: { blocks: filed.length, sources: sources.size },
+    elsewhere,
   };
 }
 

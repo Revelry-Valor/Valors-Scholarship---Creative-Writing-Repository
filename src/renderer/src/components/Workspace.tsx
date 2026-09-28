@@ -11,6 +11,7 @@ import { Palette, type Command } from './Palette';
 import { useDialogs } from './Dialogs';
 import { applyTheme, currentTheme, type Theme } from '../theme';
 import { ContextMenu, type MenuSpec } from './Menu';
+import { TemplateEditor } from './TemplateEditor';
 
 export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
   const app = useApp();
@@ -82,6 +83,23 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
       { id: 'raw', label: app.rawMarkup ? 'Show chips (hide raw markup)' : 'Show raw markup', hint: 'Ctrl+E', run: () => app.setRawMarkup(!app.rawMarkup) },
       { id: 'close-tab', label: 'Close tab', hint: 'Ctrl+W', run: () => app.active && app.closeTab(app.active) },
       { id: 'theme', label: `Theme: ${theme} → ${theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system'}`, run: cycleTheme },
+      {
+        id: 'template',
+        label: 'Edit a template (facts and sections)…',
+        run: async () => {
+          const type = await dialogs.pick({ title: 'Edit which template?', items: app.nameData.templates.map((t) => ({ label: t.name, detail: `${t.fields.length} facts · ${t.sections.length} sections`, value: t.id, color: t.color })) });
+          if (type) await dialogs.show((close) => <TemplateEditor typeId={type} onClose={() => close(null)} />);
+        },
+      },
+      {
+        id: 'upgrade',
+        label: 'Add the newest starter facts to my templates (family, friends…)',
+        run: async () => {
+          const added = await api.upgradeTemplates();
+          app.notify(added.length ? `Added: ${added.slice(0, 6).join(', ')}${added.length > 6 ? ` and ${added.length - 6} more` : ''}` : 'Your templates already have everything');
+          await app.refreshNames();
+        },
+      },
       { id: 'author', label: 'Set your name (block signatures)', run: setAuthor },
       {
         id: 'rebuild',

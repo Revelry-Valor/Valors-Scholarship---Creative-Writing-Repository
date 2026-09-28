@@ -10,6 +10,26 @@ const f = (key: string, label: string, kind: FieldDef['kind'] = 'text', extra: P
   ...extra,
 });
 
+const people = (key: string, label: string, inverse: string, one = false): FieldDef =>
+  one ? f(key, label, 'entity', { inverse }) : f(key, label, 'list', { of: 'entity', inverse });
+
+/** Family and friendship facts, linked both ways (spec 5: "entity-link fields are two-way"). */
+export const FAMILY_FIELDS: FieldDef[] = [
+  people('father', 'Father', 'children', true),
+  people('mother', 'Mother', 'children', true),
+  people('parents', 'Parents', 'children'),
+  people('spouse', 'Spouse', 'spouse'),
+  people('sons', 'Sons', 'parents'),
+  people('daughters', 'Daughters', 'parents'),
+  people('children', 'Children', 'parents'),
+  people('siblings', 'Siblings', 'siblings'),
+  people('grandfather', 'Grandfather', 'grandchildren'),
+  people('grandmother', 'Grandmother', 'grandchildren'),
+  people('grandparents', 'Grandparents', 'grandchildren'),
+  people('grandchildren', 'Grandchildren', 'grandparents'),
+  people('friends', 'Friends', 'friends'),
+];
+
 export function resolveTemplates(defs: TemplateDef[]): Map<string, ResolvedTemplate> {
   const byId = new Map(defs.map((d) => [d.id, d]));
   const out = new Map<string, ResolvedTemplate>();
@@ -88,8 +108,9 @@ const scholarshipTemplates: TemplateDef[] = [
       f('died', 'Died', 'date'),
       f('region', 'Region', 'entity', { entityType: 'place' }),
       f('tradition', 'Tradition'),
-      f('teachers', 'Teachers', 'list', { of: 'entity' }),
-      f('students', 'Students', 'list', { of: 'entity' }),
+      f('teachers', 'Teachers', 'list', { of: 'entity', inverse: 'students' }),
+      f('students', 'Students', 'list', { of: 'entity', inverse: 'teachers' }),
+      ...FAMILY_FIELDS,
     ],
     sections: ['Summary', 'Life', 'Writings', 'Positions', 'Disagreements', 'Quotes'],
     rules: [
@@ -182,6 +203,7 @@ const fantasyTemplates: TemplateDef[] = [
       f('faction', 'Faction', 'entity', { entityType: 'faction' }),
       f('home', 'Home', 'entity', { entityType: 'place' }),
       f('titles', 'Titles', 'list', { of: 'text' }),
+      ...FAMILY_FIELDS,
     ],
     sections: ['Summary', 'History', 'Relationships', 'Deeds', 'Appearances'],
     rules: [{ section: 'Relationships', when: { relationCategory: 'family' } }],
@@ -262,6 +284,11 @@ const scholarshipRelations: RelationTypeDef[] = [
   { id: 'succeeded', label: 'Succeeded', inverse: 'Succeeded by', category: 'political', lineage: true },
   { id: 'member_of', label: 'Member of', inverse: 'Has member', category: 'political' },
   { id: 'born_in', label: 'Born in', inverse: 'Birthplace of', category: 'place' },
+  { id: 'parent_of', label: 'Parent of', inverse: 'Child of', category: 'family', lineage: true },
+  { id: 'child_of', label: 'Child of', inverse: 'Parent of', category: 'family', lineage: true },
+  { id: 'sibling_of', label: 'Sibling of', inverse: 'Sibling of', category: 'family' },
+  { id: 'married_to', label: 'Married to', inverse: 'Married to', category: 'family' },
+  { id: 'friend_of', label: 'Friend of', inverse: 'Friend of', category: 'friendship' },
 ];
 
 const fantasyRelations: RelationTypeDef[] = [
@@ -282,6 +309,7 @@ const fantasyRelations: RelationTypeDef[] = [
   { id: 'worships', label: 'Worships', inverse: 'Worshipped by', category: 'agreement' },
   { id: 'owns', label: 'Owns', inverse: 'Owned by', category: 'ownership' },
   { id: 'renamed_from', label: 'Renamed from', inverse: 'Renamed to', category: 'place' },
+  { id: 'friend_of', label: 'Friend of', inverse: 'Friend of', category: 'friendship' },
 ];
 
 export const STARTER_PACKS: StarterPack[] = [
@@ -306,7 +334,7 @@ export const STARTER_PACKS: StarterPack[] = [
     name: 'Blank',
     description: 'One general Topic type and one Person type. Build your own templates.',
     templates: [
-      { id: 'person', name: 'Person', folder: 'people', color: '#b5652b', fields: [f('born', 'Born', 'date'), f('died', 'Died', 'date')], sections: ['Summary', 'Notes'] },
+      { id: 'person', name: 'Person', folder: 'people', color: '#b5652b', fields: [f('born', 'Born', 'date'), f('died', 'Died', 'date'), ...FAMILY_FIELDS], sections: ['Summary', 'Notes'] },
       ...common,
     ],
     relations: [

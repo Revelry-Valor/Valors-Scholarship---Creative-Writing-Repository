@@ -182,7 +182,6 @@ export function FormatBar({
         )}
       </div>
       <span className="fb-sep" />
-      <span className="fb-label">Link</span>
       <button className="fb-btn fb-link" title="Tag a person, place or work (@)" onMouseDown={keep} onClick={run((v) => insertMarkup(v, 'tag'))}>
         @ Tag
       </button>

@@ -193,20 +193,26 @@ function analyzeOne(b: BlockInput, stack: StackEntry[], ctx: AnalysisContext): A
       warnings.push({ from: t.from, to: t.to, code: 'unknown-field', message: `"${t.field}" is not a field of ${tpl?.name ?? 'this type'} — add it to the template?` });
       continue;
     }
-    let entityRef: string | undefined;
-    if (def.kind === 'entity' || def.of === 'entity' || t.value.startsWith('@')) {
-      const r = ctx.resolver.resolve(t.value.replace(/^@+/, '').replace(/^\[|\]$/g, ''));
-      if (r.status === 'ok') entityRef = r.id;
-    }
     const isDate = def.kind === 'date' || def.of === 'date';
-    fields.push({
-      entityId: target,
-      field: def.key,
-      valueText: t.value,
-      sort: isDate ? parsed?.sort : def.kind === 'number' ? Number(t.value) || undefined : undefined,
-      entityRef,
-      blockId,
-    });
+    const isEntity = def.kind === 'entity' || def.of === 'entity';
+    // A list of people is written {children: @Anna, @Ben}: one assignment per name.
+    const parts = def.kind === 'list' ? t.value.split(/\s*[,;]\s*/).filter(Boolean) : [t.value];
+    for (const part of parts) {
+      let entityRef: string | undefined;
+      if (isEntity || part.startsWith('@')) {
+        const r = ctx.resolver.resolve(part.replace(/^@+/, '').replace(/^\[|\]$/g, ''));
+        if (r.status === 'ok') entityRef = r.id;
+        else if (isEntity) warnings.push({ from: t.from, to: t.to, code: 'unresolved-tag', message: `No entity named "${part.replace(/^@+/, '')}" — create it?` });
+      }
+      fields.push({
+        entityId: target,
+        field: def.key,
+        valueText: part,
+        sort: isDate ? parseDate(part)?.sort : def.kind === 'number' ? Number(part) || undefined : undefined,
+        entityRef,
+        blockId,
+      });
+    }
   }
 
   // Relationships: @A >relation> @B
@@ -257,7 +263,15 @@ function analyzeOne(b: BlockInput, stack: StackEntry[], ctx: AnalysisContext): A
       f.section = explicit ?? f.section;
       continue;
     }
-    f.section = matchSection(ctx, f.entityId, nearestTitle) ?? ruleSection(ctx, f.entityId, { relations, eventDate, fields, filedIds: [...filed.keys(), ...links] });
+    // The heading a block sits under becomes its section on the profile, like a chapter
+    // heading in a document — unless that heading is the one naming this entity as owner.
+    const top = stack[stack.length - 1];
+    const headingNamesOwner = !!top && top.owners.includes(f.entityId);
+    const adHoc = !headingNamesOwner && nearestTitle ? nearestTitle : undefined;
+    f.section =
+      matchSection(ctx, f.entityId, nearestTitle) ??
+      ruleSection(ctx, f.entityId, { relations, eventDate, fields, filedIds: [...filed.keys(), ...links] }) ??
+      adHoc;
   }
 
   return {

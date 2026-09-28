@@ -2,7 +2,7 @@
 // handles autosave, block ids, and the "this block appears on N pages" guard.
 import { useEffect, useRef } from 'react';
 import { EditorView, keymap, placeholder as cmPlaceholder, drawSelection, highlightActiveLine, dropCursor } from '@codemirror/view';
-import { Annotation, EditorState, StateEffect, StateField } from '@codemirror/state';
+import { Annotation, EditorState, StateEffect, StateField, type Extension } from '@codemirror/state';
 import { Decoration, type DecorationSet } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search';
@@ -60,6 +60,8 @@ export interface EditorProps {
   onReady?: (h: EditorHandle) => void;
   /** Called after the selection or text changes (drives the formatting toolbar). */
   onUpdate?: (view: EditorView) => void;
+  /** Extra CodeMirror extensions (the profile page adds its "written elsewhere" slots). */
+  extensions?: Extension[];
 }
 
 function pagesOf(b: AnalyzedDocBlock) {
@@ -202,6 +204,7 @@ export function Editor(props: EditorProps) {
         cmPlaceholder(props.placeholder ?? ''),
         flashField,
         writingExtensions({ stripe: !isBlock }),
+        props.extensions ?? [],
         keymap.of([
           { key: 'Mod-Enter', run: (v) => (isBlock ? (void save(), true) : openEntityAtCursor(v)) },
           { key: 'Mod-s', run: () => (void save(), true), preventDefault: true },

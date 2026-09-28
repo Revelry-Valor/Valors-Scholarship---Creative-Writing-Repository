@@ -12,6 +12,12 @@ export interface FieldDef {
   of?: Exclude<FieldKind, 'list'>;
   /** For entity-link fields: restrict the picker to this type (and its descendants). */
   entityType?: string;
+  /**
+   * Two-way link: the field on the *other* entity that shows this one.
+   * `mother` has inverse `children`, so {mother: @Anna} lists this person under Anna's Children.
+   * A field that is its own inverse (friends, siblings, spouse) is symmetric.
+   */
+  inverse?: string;
 }
 
 export interface SectionRule {

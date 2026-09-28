@@ -304,11 +304,54 @@ describe('Phase 1 acceptance', () => {
     const t0 = Date.now();
     const v2 = await Vault.open(v.root, { author: 'tester' });
     const ms = Date.now() - t0;
-    expect(v2.blocks.size).toBe(10000);
+    expect([...v2.blocks.values()].filter((b) => b.owner.kind === 'entry').length).toBe(10000);
     expect(ms).toBeLessThan(30000);
     // Second open (ids already written) is the steady-state cost.
     const t1 = Date.now();
     await Vault.open(v.root, { author: 'tester' });
     console.log(`first open ${ms} ms, steady-state open ${Date.now() - t1} ms for 10,000 blocks`);
+  });
+
+  it('family facts are two-way: {mother: @Anna} lists this person under Anna\'s Children', async () => {
+    const { p } = await scouchAndPineapple();
+    const anna = await v.createEntity({ name: 'Anna Pineapple', type: 'church-father' });
+    const entry = await v.createEntry({ title: 'Family' });
+    await v.saveEntry(entry.id, '@Chamberlain Pineapple {mother: @Anna Pineapple} {friends: @Apple Scouch, @Anna Pineapple}\n');
+    const annaView = buildProfile(v, anna.id);
+    expect(annaView.facts.find((f) => f.key === 'children')!.values.map((x) => x.entity?.id)).toEqual([p]);
+    expect(annaView.facts.find((f) => f.key === 'friends')!.values[0].via).toBe("Chamberlain Pineapple's friends");
+    const pv = buildProfile(v, p);
+    expect(pv.facts.find((f) => f.key === 'friends')!.values.map((x) => x.text)).toEqual(['Apple Scouch', 'Anna Pineapple']);
+  });
+
+  it('a concept page groups paragraphs by the document they came from, in reading order', async () => {
+    const topic = await v.createEntity({ name: 'Prophecies about the Jews', type: 'topic' });
+    const a = await v.createEntry({ title: 'What God said' });
+    const b = await v.createEntry({ title: 'What they did' });
+    await v.saveEntry(a.id, 'A1 #prophecies-about-the-jews\n');
+    await v.saveEntry(b.id, 'B1 #prophecies-about-the-jews\n');
+    await v.saveEntry(a.id, 'A1 #prophecies-about-the-jews\n\nA2 #prophecies-about-the-jews\n');
+    await v.saveEntry(b.id, 'B1 #prophecies-about-the-jews\n\nB2 #prophecies-about-the-jews\n');
+    const groups = buildProfile(v, topic.id).elsewhere.flatMap((s) => s.groups);
+    expect(groups.map((g) => g.source.title)).toEqual(['What God said', 'What they did']);
+    expect(groups.map((g) => g.blocks.map((x) => x.text.slice(0, 2)))).toEqual([['A1', 'A2'], ['B1', 'B2']]);
+  });
+
+  it('a heading over a tagged paragraph becomes its section on the profile', async () => {
+    const { s } = await scouchAndPineapple();
+    const entry = await v.createEntry({ title: 'Notes' });
+    await v.saveEntry(entry.id, '## His exile\n\n@Scouch left the city in winter.\n');
+    expect(sectionOf(s, blockWith('left the city').id)).toBe('His exile');
+  });
+
+  it('new profiles start with their template sections as headings; templates can be edited', async () => {
+    const { s } = await scouchAndPineapple();
+    const body = v.files.get(v.entities.get(s)!.file)!.body;
+    expect(body).toMatch(/^## Life \^b-/m);
+    expect(body).not.toContain('## Summary');
+    const tpl = v.rawTemplate('church-father');
+    await v.saveTemplate({ ...tpl, sections: [...tpl.sections, 'Travels'], fields: [...tpl.fields, { key: 'nickname', label: 'Nickname', kind: 'text' }] });
+    expect(v.template('church-father').sections).toContain('Travels');
+    expect(buildProfile(v, s).facts.some((f) => f.key === 'nickname')).toBe(true);
   });
 });
