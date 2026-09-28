@@ -2962,3 +2962,16 @@ kbd {
 .modal:has(.spelling-settings) {
   width: min(560px, calc(100vw - 32px));
 }
+
+/* ---------- scripture references */
+.cm-scripture,
+.scripture-ref {
+  color: color-mix(in srgb, var(--accent) 80%, var(--ink));
+  text-decoration: underline dotted color-mix(in srgb, var(--accent) 60%, transparent);
+  text-underline-offset: 3px;
+  cursor: help;
+}
+.cm-scripture.quoted,
+.scripture-ref.quoted {
+  text-decoration-style: solid;
+}

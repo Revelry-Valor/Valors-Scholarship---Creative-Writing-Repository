@@ -221,6 +221,10 @@ function buildDecorations(view: EditorView): { all: DecorationSet; atomic: Decor
         if (t.kind === 'unclosed') ranges.push(Decoration.mark({ class: 'cm-warn', attributes: { title: `Unclosed ${t.what}` } }).range(from, to));
         continue;
       }
+      if (t.kind === 'scripture') {
+        ranges.push(Decoration.mark({ class: `cm-scripture${t.ref.quoted ? ' quoted' : ''}`, attributes: { title: `${t.ref.label}${t.ref.quoted ? ' · quoted' : ''}${t.ref.compare ? ' · compare' : ''}` } }).range(from, to));
+        continue;
+      }
       const editing = raw || tokenTouchesSelection(state, from, to);
       const warning = warnAt.get(t.from);
       const deco = describeToken(t, env, warning);
@@ -294,6 +298,8 @@ function describeToken(t: Token, env: EditorEnv, warning?: string): { widget: Wi
     }
     case 'pin':
       return { widget: new BadgeWidget('', '📌', 'cm-badge-pin', 'Pinned as the profile summary'), color: grey };
+    case 'scripture':
+      return null;
     case 'mark':
       return t.mark === 'key'
         ? { widget: new BadgeWidget('', '★ Important', 'cm-badge-key', 'Marked important — listed in Key details and on its pages'), color: 'var(--key)' }

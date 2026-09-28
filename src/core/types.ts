@@ -164,6 +164,8 @@ export interface BlockRecord {
   marks: string[];
   /** Phrases marked important inside the paragraph (`!!…!!`). */
   keyPhrases: string[];
+  /** Scripture references found in the paragraph. */
+  scripture: Array<{ book: string; chapter: number; verseStart?: number; verseEnd?: number; chapterEnd?: number; onward?: boolean; label: string; quoted: boolean; compare: boolean }>;
 }
 
 export interface BinderNode {

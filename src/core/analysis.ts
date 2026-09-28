@@ -42,6 +42,7 @@ export interface AnalyzedBlock {
   pinned: boolean;
   marks: string[];
   keyPhrases: string[];
+  scripture: Array<{ book: string; chapter: number; verseStart?: number; verseEnd?: number; chapterEnd?: number; onward?: boolean; label: string; quoted: boolean; compare: boolean }>;
   /** Title of the nearest heading above (or this heading's own title). */
   headingTitle?: string;
 }
@@ -83,6 +84,7 @@ function analyzeOne(b: BlockInput, stack: StackEntry[], ctx: AnalysisContext): A
   let pinned = false;
   const marks: string[] = [];
   const keyPhrases: string[] = [];
+  const scripture: AnalyzedBlock['scripture'] = [];
 
   const level = b.kind === 'heading' ? b.headingLevel ?? headingLevel(text) : 0;
   let ownTitle: string | undefined;
@@ -131,6 +133,11 @@ function analyzeOne(b: BlockInput, stack: StackEntry[], ctx: AnalysisContext): A
       case 'keyspan':
         keyPhrases.push(t.inner);
         break;
+      case 'scripture': {
+        const { from: _f, to: _t, ...ref } = t.ref;
+        scripture.push(ref);
+        break;
+      }
       case 'unclosed':
         warnings.push({ from: t.from, to: t.to, code: 'unclosed', message: `Unclosed ${t.what}` });
         break;
@@ -297,6 +304,7 @@ function analyzeOne(b: BlockInput, stack: StackEntry[], ctx: AnalysisContext): A
     pinned,
     marks,
     keyPhrases,
+    scripture,
     headingTitle: nearestTitle,
   };
 }

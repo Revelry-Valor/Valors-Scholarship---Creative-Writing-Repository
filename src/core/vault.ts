@@ -372,6 +372,7 @@ export class Vault {
         pinned: a.pinned,
         marks: a.marks,
         keyPhrases: a.keyPhrases,
+        scripture: a.scripture,
       });
     });
   }

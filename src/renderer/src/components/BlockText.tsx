@@ -98,6 +98,13 @@ export function BlockText({ text, onOpenEntity, highlight }: { text: string; onO
       case 'code':
         parts.push(<code key={key}>{body.slice(t.from + 1, t.to - 1)}</code>);
         return;
+      case 'scripture':
+        parts.push(
+          <span key={key} className={`scripture-ref ${t.ref.quoted ? 'quoted' : ''}`} title={`${t.ref.label}${t.ref.quoted ? ' · quoted' : ''}${t.ref.compare ? ' · compare' : ''}`}>
+            {body.slice(t.from, t.to)}
+          </span>,
+        );
+        return;
       case 'keyspan':
         parts.push(
           <strong key={key} className="key-phrase" title="Marked important">

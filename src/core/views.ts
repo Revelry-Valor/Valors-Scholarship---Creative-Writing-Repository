@@ -27,6 +27,7 @@ export interface BlockView {
   filedTo: Array<{ id: string; name: string; color: string }>;
   marks: string[];
   keyPhrases: string[];
+  scripture: BlockRecord['scripture'];
 }
 
 export interface FactValue {
@@ -103,6 +104,7 @@ export function blockView(v: Vault, b: BlockRecord, forEntity?: string): BlockVi
     warnings: b.warnings,
     marks: b.marks ?? [],
     keyPhrases: b.keyPhrases ?? [],
+    scripture: b.scripture ?? [],
     filedTo: b.filedTo.map((f) => {
       const e = v.entities.get(f.entityId);
       return { id: f.entityId, name: e?.name ?? f.entityId, color: e ? v.chip(e).color : '#888' };

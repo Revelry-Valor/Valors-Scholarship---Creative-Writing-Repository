@@ -4,6 +4,8 @@
 // tokenizer is shared by the indexer (to file blocks) and by the editor (to draw
 // chips, the context stripe and warning underlines), so both always agree.
 
+import { findScriptureRefs, type ScriptureRef } from './scripture';
+
 export interface NameResolver {
   /**
    * The longest known entity name or alias that `text` starts with
@@ -35,6 +37,7 @@ export type Token =
   | { kind: 'pin'; from: number; to: number }
   | { kind: 'mark'; from: number; to: number; mark: MarkKind }
   | { kind: 'keyspan'; from: number; to: number; inner: string }
+  | { kind: 'scripture'; from: number; to: number; ref: ScriptureRef }
   | { kind: 'note'; from: number; to: number; closed: boolean }
   | { kind: 'blockId'; from: number; to: number; id: string }
   | { kind: 'code'; from: number; to: number }
@@ -315,6 +318,11 @@ export function tokenize(text: string, resolver?: NameResolver): Token[] {
 
     i++;
   }
+  // Scripture references need no markup: find them in the text between other markup.
+  for (const ref of findScriptureRefs(text)) {
+    if (tokens.some((t) => t.from < ref.to && t.to > ref.from)) continue;
+    tokens.push({ kind: 'scripture', from: ref.from, to: ref.to, ref });
+  }
   return tokens.sort((a, b) => a.from - b.from);
 }
 
@@ -469,6 +477,9 @@ export function plainText(text: string, resolver?: NameResolver): string {
         break;
       case 'keyspan':
         out += t.inner;
+        break;
+      case 'scripture':
+        out += text.slice(t.from, t.to);
         break;
       default:
         break;
