@@ -2975,3 +2975,125 @@ kbd {
 .scripture-ref.quoted {
   text-decoration-style: solid;
 }
+
+/* ---------- library */
+.library-section {
+  max-height: 26%;
+  border-top: 1px solid var(--line);
+}
+.library-section.drop-over {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+.lib-icon {
+  color: var(--accent) !important;
+  font-size: 11px !important;
+}
+.drop-zone {
+  border: 2px dashed var(--line);
+  border-radius: 10px;
+  padding: 22px;
+  text-align: center;
+  color: var(--muted);
+  cursor: pointer;
+  margin: 10px 0 6px;
+  background: var(--surface);
+}
+.drop-zone:hover {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+.import-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 12px 0 6px;
+}
+.import-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+.import-grid .input {
+  font-weight: 400;
+}
+.import-progress {
+  color: var(--accent);
+  font-size: 13px;
+}
+.modal:has(.import-dialog) {
+  width: min(620px, calc(100vw - 32px));
+}
+.reader-bar {
+  margin: 0 -24px;
+}
+.reader-kind {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-right: 8px;
+}
+.reader-title {
+  pointer-events: none;
+}
+.reader-body {
+  padding: 0 0 60px 28px;
+  font-family: var(--doc-font);
+  font-size: 17px;
+  line-height: 1.7;
+}
+.reader-heading {
+  font: 600 1.35em/1.35 var(--doc-font);
+  margin: 1.2em 0 0.4em;
+}
+.reader-para {
+  position: relative;
+  margin: 0 -10px 0.7em;
+  padding: 2px 10px;
+  border-radius: 5px;
+}
+.reader-body.bible .reader-para {
+  margin-bottom: 0.25em;
+}
+.reader-para:hover {
+  background: var(--surface);
+}
+.reader-para.filed {
+  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.reader-para.marked {
+  background: var(--key-soft);
+}
+.reader-para .block-text {
+  display: inline;
+}
+.verse-num {
+  color: var(--accent);
+  font: 600 0.62em var(--sans);
+  margin-right: 4px;
+  vertical-align: 0.5em;
+}
+.reader-actions {
+  position: absolute;
+  right: 4px;
+  top: -12px;
+  display: flex;
+  gap: 2px;
+  padding: 1px 4px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+  opacity: 0;
+  pointer-events: none;
+}
+.reader-para:hover .reader-actions,
+.reader-para:focus-within .reader-actions {
+  opacity: 1;
+  pointer-events: auto;
+}

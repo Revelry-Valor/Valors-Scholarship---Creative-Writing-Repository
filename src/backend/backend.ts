@@ -178,6 +178,16 @@ export class Backend {
     saveView: async (def: ViewDef) => this.v().saveView(def),
     deleteView: async (id: string) => this.v().deleteView(id),
     keyDetails: async (filters?: KeyDetailFilters) => keyDetails(this.v(), filters),
+    importLibrary: async (opts: { title: string; text?: string; dataBase64?: string; filename?: string; kind?: 'auto' | 'bible' | 'text'; author?: string; date?: string; translation?: string; makePage?: boolean }) => {
+      let text = opts.text ?? '';
+      if (opts.dataBase64 && /\.docx$/i.test(opts.filename ?? '')) text = await docxToText(opts.dataBase64);
+      if (!text.trim()) throw new Error('That file has no text I can read.');
+      return this.v().importLibrary({ ...opts, text });
+    },
+    listLibrary: async () => this.v().listLibrary(),
+    getLibraryDoc: async (id: string) => this.v().getLibraryDoc(id),
+    deleteLibrary: async (target: { id?: string; collection?: string }) => this.v().deleteLibrary(target),
+    annotateLibraryBlock: async (blockId: string, action: { entityId?: string; section?: string; mark?: 'key' | 'check' }) => this.v().annotateLibraryBlock(blockId, action),
     graph: async () => buildGraph(this.v()),
     timeline: async () => buildTimeline(this.v()),
     getEntityNotes: async (id: string) => {
@@ -254,3 +264,17 @@ function safeUser(): string {
 }
 
 export type BackendMethods = Backend['methods'];
+
+/** Plain text from a Word document (works in Node and in the browser demo). */
+async function docxToText(b64: string): Promise<string> {
+  const mod = (await import('mammoth')) as unknown as { default?: MammothLike } & MammothLike;
+  const mammoth = mod.default ?? mod;
+  const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  const input = typeof Buffer !== 'undefined' ? { buffer: Buffer.from(bytes) } : { arrayBuffer: bytes.buffer };
+  const r = await mammoth.extractRawText(input);
+  return r.value;
+}
+
+interface MammothLike {
+  extractRawText(input: { buffer?: unknown; arrayBuffer?: ArrayBuffer }): Promise<{ value: string }>;
+}

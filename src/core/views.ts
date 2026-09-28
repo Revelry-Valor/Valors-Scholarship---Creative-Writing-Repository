@@ -4,13 +4,13 @@
 import { parseDate } from './dates';
 import { normalizeName, plainText } from './markup';
 import type { Vault } from './vault';
-import type { BlockRecord, BlockStatus, EntityChip, FieldKind, FiledVia, ResolvedTemplate } from './types';
+import type { DocKind, BlockRecord, BlockStatus, EntityChip, FieldKind, FiledVia, ResolvedTemplate } from './types';
 
 export interface BlockView {
   id: string;
   text: string;
   kind: BlockRecord['kind'];
-  source: { kind: 'entry' | 'entity'; id: string; title: string };
+  source: { kind: DocKind; id: string; title: string };
   /** How this block reached the page being viewed. */
   via?: FiledVia | 'link';
   section?: string;
@@ -336,7 +336,7 @@ export function buildProfile(v: Vault, entityId: string): ProfileView {
 // ---------------------------------------------------------------- search
 
 export interface SwitchResult {
-  kind: 'entry' | 'entity';
+  kind: DocKind;
   id: string;
   title: string;
   detail: string;
@@ -399,7 +399,7 @@ export interface SearchHit {
 export interface SearchFilters {
   entityId?: string;
   type?: string;
-  kind?: 'entry' | 'entity';
+  kind?: DocKind;
 }
 
 export function searchBlocks(v: Vault, query: string, filters: SearchFilters = {}, limit = 200): SearchHit[] {

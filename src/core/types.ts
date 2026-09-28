@@ -147,7 +147,7 @@ export interface BlockRecord {
   id: string;
   file: string;
   /** Owning entry id or entity id. */
-  owner: { kind: 'entry' | 'entity'; id: string };
+  owner: { kind: DocKind; id: string };
   position: number;
   kind: BlockKind;
   headingLevel?: number;
@@ -217,4 +217,23 @@ export interface ViewDef {
   types?: string[];
   /** Timelines: one lane per type, or one per entity. */
   lanes?: 'type' | 'entity';
+}
+
+/** Where a block lives: your writing, an entity's own page, or an imported source. */
+export type DocKind = 'entry' | 'entity' | 'library';
+
+/** An imported, read-only source in library/ (spec 12.1). */
+export interface LibraryRecord {
+  id: string;
+  title: string;
+  file: string;
+  kind: 'bible' | 'text';
+  /** Folder under library/ (a Bible translation, or '' for single texts). */
+  collection: string;
+  author?: string;
+  date?: string;
+  translation?: string;
+  book?: string;
+  /** The Work/Source page made for this text. */
+  page?: string;
 }

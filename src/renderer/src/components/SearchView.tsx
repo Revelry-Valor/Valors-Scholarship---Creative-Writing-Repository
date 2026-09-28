@@ -58,7 +58,7 @@ export function SearchView({ query }: { query: string }) {
         {hits && hits.length > 0 && <p className="muted small">{hits.length === 200 ? '200+ blocks' : `${hits.length} block${hits.length === 1 ? '' : 's'}`}</p>}
         {hits?.map((h) => (
           <article key={h.block.id} className="block-card search-hit">
-            <div className="block-body" onClick={() => app.openTab(h.block.source.kind === 'entry' ? { kind: 'entry', id: h.block.source.id, focusBlock: h.block.id } : { kind: 'entity', id: h.block.source.id, focusBlock: h.block.id })}>
+            <div className="block-body" onClick={() => app.openTab({ kind: h.block.source.kind, id: h.block.source.id, focusBlock: h.block.id })}>
               <BlockText text={h.block.text} />
             </div>
             <footer className="block-foot">

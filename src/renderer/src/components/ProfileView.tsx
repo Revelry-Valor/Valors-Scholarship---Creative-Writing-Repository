@@ -333,7 +333,7 @@ function ElsewhereGroups({ groups, entityId }: { groups: SourceGroup[]; entityId
     <div className="elsewhere">
       {groups.map((g) => (
         <div key={`${g.source.kind}:${g.source.id}`} className="elsewhere-group">
-          <button className="elsewhere-source" onClick={() => app.openTab(g.source.kind === 'entry' ? { kind: 'entry', id: g.source.id } : { kind: 'entity', id: g.source.id })} title="Open this document">
+          <button className="elsewhere-source" onClick={() => app.openTab({ kind: g.source.kind, id: g.source.id })} title="Open this document">
             from <em>{g.source.title}</em>
           </button>
           {g.blocks.map((b) => (
@@ -346,7 +346,7 @@ function ElsewhereGroups({ groups, entityId }: { groups: SourceGroup[]; entityId
 }
 
 function openSource(app: ReturnType<typeof useApp>, b: BlockView) {
-  app.openTab(b.source.kind === 'entry' ? { kind: 'entry', id: b.source.id, focusBlock: b.id } : { kind: 'entity', id: b.source.id, focusBlock: b.id });
+  app.openTab({ kind: b.source.kind, id: b.source.id, focusBlock: b.id });
 }
 
 function SourceLink({ b }: { b: BlockView }) {
@@ -484,7 +484,7 @@ function FactRow({ entityId, fact }: { entityId: string; fact: FactView }) {
                   title={`Set in “${v.sourceTitle}”`}
                   onClick={async () => {
                     const b = await api.getBlock(v.source);
-                    app.openTab(b.source.kind === 'entry' ? { kind: 'entry', id: b.source.id, focusBlock: b.id } : { kind: 'entity', id: b.source.id, focusBlock: b.id });
+                    app.openTab({ kind: b.source.kind, id: b.source.id, focusBlock: b.id });
                   }}
                 >
                   ↗

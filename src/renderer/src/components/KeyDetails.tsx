@@ -7,7 +7,7 @@ import { BlockText } from './BlockText';
 import type { BlockView } from '../../../core/views';
 
 function open(app: ReturnType<typeof useApp>, b: BlockView) {
-  app.openTab(b.source.kind === 'entry' ? { kind: 'entry', id: b.source.id, focusBlock: b.id } : { kind: 'entity', id: b.source.id, focusBlock: b.id });
+  app.openTab({ kind: b.source.kind, id: b.source.id, focusBlock: b.id });
 }
 
 function icon(b: BlockView) {
@@ -88,7 +88,7 @@ export function KeyDetailsPage() {
       {groups?.map((g) => (
         <section key={`${g.source.kind}:${g.source.id}`} className="kd-group">
           <h2>
-            <button className="linkish" onClick={() => app.openTab(g.source.kind === 'entry' ? { kind: 'entry', id: g.source.id } : { kind: 'entity', id: g.source.id })}>
+            <button className="linkish" onClick={() => app.openTab({ kind: g.source.kind, id: g.source.id })}>
               {g.source.title}
             </button>
             <span className="count">{g.blocks.length}</span>

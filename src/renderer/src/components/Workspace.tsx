@@ -14,6 +14,7 @@ import { ContextMenu, type MenuSpec } from './Menu';
 import { TemplateEditor } from './TemplateEditor';
 import { ViewPage } from '../charts/ViewPage';
 import { KeyDetailsPage } from './KeyDetails';
+import { LibraryReader, importToLibrary } from './Library';
 import { SpellingSettings } from './SpellingSettings';
 import { setSpellingPrefs } from '../editor/spelling';
 import { newView, addType } from './ViewsSidebar';
@@ -92,6 +93,7 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
       { id: 'raw', label: app.rawMarkup ? 'Show chips (hide raw markup)' : 'Show raw markup', hint: 'Ctrl+E', run: () => app.setRawMarkup(!app.rawMarkup) },
       { id: 'close-tab', label: 'Close tab', hint: 'Ctrl+W', run: () => app.active && app.closeTab(app.active) },
       { id: 'theme', label: `Theme: ${theme} → ${theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system'}`, run: cycleTheme },
+      { id: 'import', label: 'Import into the Library (Bibles, works, articles)…', run: () => importToLibrary(app, dialogs) },
       { id: 'key-details', label: 'Key details: everything marked important or to check', run: () => app.openTab({ kind: 'marks' }) },
       { id: 'new-view', label: 'New timeline or tree (family, lineage, tech, radial, web)…', run: () => newView(app, dialogs) },
       { id: 'add-type', label: 'Add a type (Settlement, Race, Species, Flora, Fauna, Technology…)', run: () => addType(app, dialogs) },
@@ -190,6 +192,7 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
     if (t.kind === 'entity') return app.entityById.get(t.id)?.name ?? '…';
     if (t.kind === 'search') return 'Search';
     if (t.kind === 'marks') return '★ Key details';
+    if (t.kind === 'library') return <LibraryTitle id={t.id} />;
     if (t.kind === 'view') return <ViewTitle id={t.id} />;
     return null;
   };
@@ -267,6 +270,7 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
           {activeTab?.kind === 'search' && <SearchView query={activeTab.query} />}
           {activeTab?.kind === 'view' && <ViewPage key={activeTab.key} id={activeTab.id} />}
           {activeTab?.kind === 'marks' && <KeyDetailsPage />}
+          {activeTab?.kind === 'library' && <LibraryReader key={activeTab.key} id={activeTab.id} focusBlock={activeTab.focusBlock} />}
           {!activeTab && <Welcome onNewEntry={newEntry} onNewEntity={() => newEntity()} onGoto={() => setPalette('switch')} />}
         </div>
       </div>
@@ -283,6 +287,15 @@ export function Workspace({ onCloseVault }: { onCloseVault: () => void }) {
       </div>
     </div>
   );
+}
+
+function LibraryTitle({ id }: { id: string }) {
+  const app = useApp();
+  const [name, setName] = useState('…');
+  useEffect(() => {
+    api.listLibrary().then((ls) => setName(ls.find((l) => l.id === id)?.title ?? '(removed)'));
+  }, [id, app.version]);
+  return <>❡ {name}</>;
 }
 
 function ViewTitle({ id }: { id: string }) {

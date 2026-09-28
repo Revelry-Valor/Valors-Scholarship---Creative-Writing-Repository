@@ -6,6 +6,7 @@ import { useDialogs } from './Dialogs';
 import { ContextMenu, type MenuSpec } from './Menu';
 import { STATUSES } from './EntryView';
 import { ViewsSection, addType } from './ViewsSidebar';
+import { LibrarySection } from './Library';
 import type { BinderNode, EntryStatus } from '../../../core/types';
 
 type Parent = { kind: 'root' } | { kind: 'folder'; path: string } | { kind: 'entry'; id: string };
@@ -351,6 +352,7 @@ export function Sidebar({ onSwitchVault }: { onSwitchVault: () => void }) {
       </div>
 
       <ViewsSection />
+      <LibrarySection />
 
       <div className="side-section grow">
         <div className="side-head">

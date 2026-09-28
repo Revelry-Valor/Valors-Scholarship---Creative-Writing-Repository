@@ -1,7 +1,7 @@
 // Runs the real backend and engine inside the page, over the in-memory file system.
 import { Backend, type BackendEvent } from '../backend/backend';
 import { Vault } from '../core/vault';
-import { hasDemoData, resetDemoFs } from './shims/fs';
+import { hasDemoData, loadDemoFs, resetDemoFs } from './shims/fs';
 
 const VAULT = '/home/you/Documents/Living Repository/Scholarship';
 
@@ -189,6 +189,7 @@ const listeners = new Set<(e: BackendEvent) => void>();
 backend.onEvent((e) => listeners.forEach((fn) => fn(e)));
 
 const ready = (async () => {
+  await loadDemoFs();
   await backend.init();
   // The fantasy sample is added alongside, so an existing Scholarship sample keeps your changes.
   if (!Vault.isVault(WORLD)) {
@@ -235,8 +236,8 @@ window.__lrBackend = {
     listeners.add(fn);
     return () => listeners.delete(fn);
   },
-  reset: () => {
-    resetDemoFs();
+  reset: async () => {
+    await resetDemoFs();
     try {
       for (const k of Object.keys(localStorage)) if (k.startsWith('lr.')) localStorage.removeItem(k);
     } catch {

@@ -32,8 +32,11 @@ import {
 import { countWords, formatTag, normalizeName, plainText, tokenize, type TagToken } from './markup';
 import { MetaStore } from './meta';
 import { NameTable } from './names';
+import { importText, type ImportOptions } from './importer';
 import { colorFor, fallbackTemplate, resolveTemplates, STARTER_PACKS, WORLD_TEMPLATES, type StarterPack } from './templates';
 import type {
+  DocKind,
+  LibraryRecord,
   BinderNode,
   BlockRecord,
   DocFormat,
@@ -53,7 +56,7 @@ import type {
 export const VAULT_MARKER = 'settings.yaml';
 
 interface FileState {
-  kind: 'entry' | 'entity';
+  kind: DocKind;
   ownerId: string;
   blocks: ParsedBlock[];
   frontmatter: Record<string, unknown>;
@@ -93,6 +96,7 @@ export class Vault {
   templates = new Map<string, ResolvedTemplate>();
   relationTypes = new Map<string, RelationTypeDef>();
   entries = new Map<string, EntryRecord>();
+  library = new Map<string, LibraryRecord>();
   entities = new Map<string, EntityRecord>();
   blocks = new Map<string, BlockRecord>();
   files = new Map<string, FileState>();
@@ -171,6 +175,7 @@ export class Vault {
     await this.loadConfig();
     await this.meta.load();
     this.entries.clear();
+    this.library.clear();
     this.entities.clear();
     this.blocks.clear();
     this.files.clear();
@@ -180,6 +185,7 @@ export class Vault {
     this.rebuildNames();
     const entryFiles = await this.walk('entries');
     for (const rel of entryFiles) await this.loadEntryFile(rel);
+    for (const rel of await this.walk('library')) await this.loadLibraryFile(rel);
 
     // Blocks created outside the app get ids written back once.
     for (const rel of [...this.files.keys()]) await this.ensureBlockIds(rel);
@@ -280,6 +286,137 @@ export class Vault {
     this.files.set(rel, { kind: 'entity', ownerId: id, blocks: parsed.blocks, frontmatter: fm, body: parsed.body });
   }
 
+  private async loadLibraryFile(rel: string, content?: string) {
+    content ??= await this.readRel(rel);
+    const parsed = parseFile(content);
+    const fm = parsed.frontmatter;
+    let id = typeof fm.id === 'string' ? fm.id : '';
+    if (!id || [...this.library.values()].some((l) => l.id === id && l.file !== rel)) {
+      id = newId('n');
+      fm.id = id;
+      fm.title ??= path.posix.basename(rel, '.md');
+      await this.writeRel(rel, stringifyFile(fm, parsed.body));
+    }
+    const dir = path.posix.dirname(rel);
+    this.library.set(id, {
+      id,
+      title: String(fm.title ?? path.posix.basename(rel, '.md')),
+      file: rel,
+      kind: fm.kind === 'bible' ? 'bible' : 'text',
+      collection: dir === 'library' ? '' : dir.replace(/^library\//, ''),
+      author: typeof fm.author === 'string' ? fm.author : undefined,
+      date: fm.date !== undefined ? String(fm.date) : undefined,
+      translation: typeof fm.translation === 'string' ? fm.translation : undefined,
+      book: typeof fm.book === 'string' ? fm.book : undefined,
+      page: typeof fm.page === 'string' ? fm.page : undefined,
+    });
+    this.files.set(rel, { kind: 'library', ownerId: id, blocks: parsed.blocks, frontmatter: fm, body: parsed.body });
+  }
+
+  // ---------------------------------------------------------------- library
+
+  /**
+   * Import outside text (spec 12.1): Bibles become one file per book, one verse per
+   * paragraph; other texts become one read-only source. Optionally makes a Work page.
+   */
+  importLibrary(opts: ImportOptions & { makePage?: boolean }) {
+    return this.exclusive(async () => {
+      const result = importText(opts);
+      const dir = result.collection ? `library/${result.collection}` : 'library';
+      const ids: string[] = [];
+      let page: string | undefined;
+      if (opts.makePage && result.kind === 'text') {
+        const type = ['work', 'source'].find((t) => this.templates.has(t)) ?? this.topicType();
+        const name = opts.title.trim();
+        const existing = this.names.resolve(name);
+        page = existing.status === 'ok' ? existing.id : (await this.writeNewEntity(name, type)).id;
+        const author = opts.author?.trim();
+        if (author) {
+          const e = this.entities.get(page)!;
+          const st = this.files.get(e.file)!;
+          const fields = (st.frontmatter.fields as Record<string, unknown>) ?? {};
+          if (!fields.author) {
+            fields.author = `@${author}`;
+            st.frontmatter.fields = fields;
+            await this.writeRel(e.file, stringifyFile(st.frontmatter, st.body));
+            await this.loadEntityFile(e.file);
+          }
+        }
+        this.rebuildNames();
+      }
+      for (const f of result.files) {
+        const rel = await this.uniquePath(dir, slugify(f.name));
+        const fm = { ...f.frontmatter, id: newId('n'), imported: new Date().toISOString().slice(0, 10), ...(page ? { page } : {}) };
+        await this.writeRel(rel, stringifyFile(fm, f.body));
+        await this.loadLibraryFile(rel);
+        await this.ensureBlockIds(rel);
+        ids.push(fm.id);
+      }
+      this.analyzeAll();
+      await this.meta.flush();
+      this.emit({ files: result.files.map((f) => f.name), entities: !!page, binder: true });
+      return { kind: result.kind, ids, paragraphs: result.paragraphs, collection: result.collection, page };
+    });
+  }
+
+  /**
+   * File a paragraph of an imported source to an entity (and optionally a section), or mark it.
+   * The tag is appended to the paragraph, so the source text itself is unchanged.
+   */
+  annotateLibraryBlock(blockId: string, action: { entityId?: string; section?: string; mark?: 'key' | 'check' }) {
+    return this.exclusive(async () => {
+      const b = this.getBlock(blockId);
+      if (b.owner.kind !== 'library') throw new Error('Not a library paragraph');
+      let text = b.text;
+      if (action.entityId) {
+        const e = this.entities.get(action.entityId);
+        if (!e) throw new Error('No such entity');
+        if (!b.filedTo.some((f) => f.entityId === e.id && (!action.section || f.section === action.section))) {
+          let tag = formatTag(e.name);
+          if (action.section) tag += `::${/\s/.test(action.section) ? `[${action.section}]` : action.section}`;
+          text = `${text.trimEnd()} ${tag}`;
+        }
+      }
+      if (action.mark && !b.marks.includes(action.mark)) text = `${text.trimEnd()} !${action.mark}`;
+      if (text === b.text) return { body: '', changed: false, created: [] };
+      const st = this.files.get(b.file)!;
+      return this.saveBody(b.file, replaceBlockInBody(st.body, blockId, text)!);
+    });
+  }
+
+  listLibrary(): LibraryRecord[] {
+    return [...this.library.values()].sort((a, b) => a.collection.localeCompare(b.collection) || a.file.localeCompare(b.file));
+  }
+
+  getLibraryDoc(id: string) {
+    const rec = this.library.get(id);
+    if (!rec) throw new Error(`No library document ${id}`);
+    const st = this.files.get(rec.file)!;
+    return {
+      ...rec,
+      blocks: st.blocks
+        .filter((b) => b.id)
+        .map((b) => {
+          const r = this.blocks.get(b.id!);
+          return { id: b.id!, text: b.text, kind: b.kind, headingLevel: b.headingLevel, filedTo: r?.filedTo.map((f) => f.entityId) ?? [], marked: !!(r?.marks.length || r?.keyPhrases.length) };
+        }),
+    };
+  }
+
+  /** Delete one imported source, or a whole collection (e.g. a Bible translation). */
+  deleteLibrary(target: { id?: string; collection?: string }) {
+    return this.exclusive(async () => {
+      if (target.collection) await this.toTrash(`library/${target.collection}`);
+      else if (target.id) {
+        const rec = this.library.get(target.id);
+        if (!rec) throw new Error('No such source');
+        await this.toTrash(rec.file);
+      }
+      await this.rebuildIndex();
+      this.emit({ files: [], entities: false, binder: true });
+    });
+  }
+
   private async loadEntryFile(rel: string, content?: string) {
     content ??= await this.readRel(rel);
     const parsed = parseFile(content);
@@ -353,7 +490,8 @@ export class Vault {
       if (!pb.id) return;
       const a = analyzed[i];
       this.pending.push(...a.creates);
-      this.meta.touch(pb.id, pb.text, this.author);
+      // Imported sources are read-only: no authorship history for their paragraphs.
+      if (st.kind !== 'library') this.meta.touch(pb.id, pb.text, this.author);
       this.blocks.set(pb.id, {
         id: pb.id,
         file: rel,
@@ -1110,13 +1248,14 @@ export class Vault {
   }
 
   sourceTitle(b: BlockRecord): string {
+    if (b.owner.kind === 'library') return this.library.get(b.owner.id)?.title ?? b.file;
     return b.owner.kind === 'entry' ? this.entries.get(b.owner.id)?.title ?? b.file : this.entities.get(b.owner.id)?.name ?? b.file;
   }
 
   /** Every page a block appears on: its home plus each profile it is filed to. */
-  blockPages(id: string): Array<{ kind: 'entry' | 'entity'; id: string; title: string }> {
+  blockPages(id: string): Array<{ kind: DocKind; id: string; title: string }> {
     const b = this.getBlock(id);
-    const pages: Array<{ kind: 'entry' | 'entity'; id: string; title: string }> = [{ kind: b.owner.kind, id: b.owner.id, title: this.sourceTitle(b) }];
+    const pages: Array<{ kind: DocKind; id: string; title: string }> = [{ kind: b.owner.kind, id: b.owner.id, title: this.sourceTitle(b) }];
     for (const f of b.filedTo) {
       if (b.owner.kind === 'entity' && f.entityId === b.owner.id) continue;
       pages.push({ kind: 'entity', id: f.entityId, title: this.entities.get(f.entityId)?.name ?? f.entityId });
@@ -1251,6 +1390,12 @@ export class Vault {
         this.rebuildNames();
         await this.ensureBlockIds(rel);
         this.analyzeAll();
+      } else if (st.kind === 'library') {
+        this.files.delete(rel);
+        this.library.delete(st.ownerId);
+        await this.loadLibraryFile(rel, content);
+        await this.ensureBlockIds(rel);
+        this.analyzeFile(rel);
       } else {
         this.files.delete(rel);
         this.entries.delete(st.ownerId);

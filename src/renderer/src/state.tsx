@@ -11,6 +11,7 @@ export type Tab =
   | { key: string; kind: 'entity'; id: string; focusBlock?: string }
   | { key: string; kind: 'search'; query: string }
   | { key: string; kind: 'view'; id: string }
+  | { key: string; kind: 'library'; id: string; focusBlock?: string }
   | { key: string; kind: 'marks' };
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;

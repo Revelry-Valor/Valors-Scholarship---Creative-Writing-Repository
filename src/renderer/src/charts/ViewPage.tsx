@@ -45,7 +45,7 @@ const LINEAGE_KINDS = [
 
 async function openBlock(app: ReturnType<typeof useApp>, blockId: string) {
   const b = await api.getBlock(blockId);
-  app.openTab(b.source.kind === 'entry' ? { kind: 'entry', id: b.source.id, focusBlock: b.id } : { kind: 'entity', id: b.source.id, focusBlock: b.id });
+  app.openTab({ kind: b.source.kind, id: b.source.id, focusBlock: b.id });
 }
 
 export function ViewPage({ id }: { id: string }) {

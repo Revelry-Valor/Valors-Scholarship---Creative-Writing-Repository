@@ -15,6 +15,7 @@ export default defineConfig({
       'node:path': shim('path.ts'),
       'node:os': shim('os.ts'),
       chokidar: shim('chokidar.ts'),
+      mammoth: resolve('node_modules/mammoth/mammoth.browser.js'),
     },
   },
   define: { 'process.env': '{}', 'process.platform': '"web"' },
