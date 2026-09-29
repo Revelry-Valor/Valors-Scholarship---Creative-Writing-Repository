@@ -1,0 +1,66 @@
+# Builds the Windows installer and publishes it as a GitHub Release.
+# Runs when package.json changes on main (that is how a new version is released),
+# or by hand: Actions tab → "Build and release the Windows app" → Run workflow.
+# Installed copies of the app find the new release and update themselves.
+name: Build and release the Windows app
+
+on:
+  push:
+    branches: [main]
+    paths: [package.json]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Test
+        run: npm test
+        # A test that only fails on Windows is reported in red here but does not stop the installer.
+        continue-on-error: true
+
+      - name: Check whether this version was already released
+        id: version
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          v=$(node -p "require('./package.json').version")
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          if gh release view "v$v" >/dev/null 2>&1; then
+            echo "Version $v is already released. Raise the version in package.json to publish an update."
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and publish
+        if: steps.version.outputs.exists == 'false'
+        run: npm run build && npx electron-builder --win --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Keep the installer with this run too
+        if: steps.version.outputs.exists == 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: LivingRepository-Setup-${{ steps.version.outputs.version }}
+          path: release/*.exe
+          if-no-files-found: error
