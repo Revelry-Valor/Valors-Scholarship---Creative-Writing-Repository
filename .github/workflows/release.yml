@@ -7,7 +7,7 @@ name: Build and release the Windows app
 on:
   push:
     branches: [main]
-    paths: [package.json]
+    paths: [package.json, .github/workflows/release.yml]
   workflow_dispatch:
 
 permissions:
@@ -51,11 +51,27 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Build and publish
+      - name: Build the installer
         if: steps.version.outputs.exists == 'false'
-        run: npm run build && npx electron-builder --win --publish always
+        run: npm run build && npx electron-builder --win --publish never
+
+      # The release is created here, with its tag, and the three files the app's
+      # updater reads are attached: the installer, its blockmap and latest.yml.
+      - name: Publish the release
+        if: steps.version.outputs.exists == 'false'
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          v="${{ steps.version.outputs.version }}"
+          ls release
+          gh release create "v$v" \
+            --target "$GITHUB_SHA" \
+            --title "Living Repository $v" \
+            --notes "Download **LivingRepository-Setup-$v.exe** below and run it. If Windows says it protected your PC, choose *More info → Run anyway* (the beta is not code-signed yet). Installed copies update themselves." \
+            release/LivingRepository-Setup-$v.exe \
+            release/LivingRepository-Setup-$v.exe.blockmap \
+            release/latest.yml
 
       - name: Keep the installer with this run too
         if: steps.version.outputs.exists == 'false'
