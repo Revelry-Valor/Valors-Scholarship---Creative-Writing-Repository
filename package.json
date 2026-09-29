@@ -1,7 +1,7 @@
 {
   "name": "living-repository",
   "productName": "Living Repository",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "A writing environment for writers and scholars that links people, places, topics and scripture as you write.",
   "private": true,
   "type": "module",
