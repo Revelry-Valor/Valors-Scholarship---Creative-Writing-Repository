@@ -263,7 +263,7 @@ export function Sidebar({ onSwitchVault }: { onSwitchVault: () => void }) {
     const groups = new Map<string, ApiResult<'listEntities'>>();
     for (const t of app.nameData.templates) groups.set(t.id, []);
     for (const e of app.nameData.entities) {
-      if (q && !e.name.toLowerCase().includes(q) && !e.aliases.some((a) => a.toLowerCase().includes(q))) continue;
+      if (q && !e.name.toLowerCase().includes(q) && ![...e.aliases, ...(e.autoAliases ?? [])].some((a) => a.toLowerCase().includes(q))) continue;
       if (!groups.has(e.type)) groups.set(e.type, []);
       groups.get(e.type)!.push(e);
     }

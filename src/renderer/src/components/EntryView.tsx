@@ -133,6 +133,7 @@ export function EntryView({ id, focusBlock, onHandle }: { id: string; focusBlock
             </span>
           </div>
         </header>
+        <DocumentBacklinks id={id} />
         <Editor
           key={id}
           mode="document"
@@ -182,6 +183,50 @@ export function EntryView({ id, focusBlock, onHandle }: { id: string; focusBlock
           }}
         />
       </div>
+    </div>
+  );
+}
+
+/** Other documents and pages that link to or quote this one ([[Title]], ![[Title]]). */
+function DocumentBacklinks({ id }: { id: string }) {
+  const app = useApp();
+  const [links, setLinks] = useState<ApiResult<'documentBacklinks'>>([]);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    api.documentBacklinks(id).then(setLinks).catch(() => setLinks([]));
+  }, [id, app.version]);
+  if (!links.length) return null;
+  const sources = [...new Map(links.map((l) => [`${l.source.kind}:${l.source.id}`, l.source])).values()];
+  return (
+    <div className="doc-backlinks">
+      <button className="linkish small" onClick={() => setOpen(!open)}>
+        ↩ Linked from {sources.length} {sources.length === 1 ? 'place' : 'places'} {open ? '▾' : '▸'}
+      </button>
+      {!open && (
+        <span className="muted small">
+          {' '}
+          {sources
+            .slice(0, 3)
+            .map((s) => s.title)
+            .join(' · ')}
+          {sources.length > 3 ? ' …' : ''}
+        </span>
+      )}
+      {open && (
+        <ul>
+          {links.map((l) => (
+            <li key={l.id}>
+              <button className="linkish" onClick={() => app.openTab({ kind: l.source.kind as 'entry', id: l.source.id, focusBlock: l.id })}>
+                {l.quoted ? '❝ ' : '📄 '}
+                {l.source.title}
+              </button>
+              <div className="doc-backlink-text">
+                <BlockText text={l.text} />
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

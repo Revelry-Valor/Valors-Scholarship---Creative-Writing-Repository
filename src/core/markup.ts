@@ -5,6 +5,7 @@
 // chips, the context stripe and warning underlines), so both always agree.
 
 import { findScriptureRefs, type ScriptureRef } from './scripture';
+import { findDates, type FoundDate } from './dates';
 
 export interface NameResolver {
   /**
@@ -38,6 +39,9 @@ export type Token =
   | { kind: 'mark'; from: number; to: number; mark: MarkKind }
   | { kind: 'keyspan'; from: number; to: number; inner: string }
   | { kind: 'scripture'; from: number; to: number; ref: ScriptureRef }
+  | { kind: 'date'; from: number; to: number; date: FoundDate }
+  /** ![[Name]], ![[Document]] or ![[#b-id]]: a live quotation of a page, a document or one paragraph. */
+  | { kind: 'embed'; from: number; to: number; target: string }
   | { kind: 'note'; from: number; to: number; closed: boolean }
   | { kind: 'blockId'; from: number; to: number; id: string }
   | { kind: 'code'; from: number; to: number }
@@ -236,6 +240,16 @@ export function tokenize(text: string, resolver?: NameResolver): Token[] {
       }
     }
 
+    // ![[…]] quotes a page, a document or a paragraph (#b-id), live
+    if (ch === '!' && text.startsWith('![[', i)) {
+      const j = readBracket(text, i + 1, '[[', ']]');
+      if (j !== -1) {
+        tokens.push({ kind: 'embed', from: i, to: j + 2, target: text.slice(i + 3, j).trim() });
+        i = j + 2;
+        continue;
+      }
+    }
+
     // [[Name]] or [[Name|shown]]
     if (ch === '[' && text[i + 1] === '[') {
       const j = readBracket(text, i, '[[', ']]');
@@ -322,6 +336,11 @@ export function tokenize(text: string, resolver?: NameResolver): Token[] {
   for (const ref of findScriptureRefs(text)) {
     if (tokens.some((t) => t.from < ref.to && t.to > ref.from)) continue;
     tokens.push({ kind: 'scripture', from: ref.from, to: ref.to, ref });
+  }
+  // Dates written in prose ("May 4th 2026") date the paragraph.
+  for (const d of findDates(text)) {
+    if (tokens.some((t) => t.from < d.to && t.to > d.from)) continue;
+    tokens.push({ kind: 'date', from: d.from, to: d.to, date: d });
   }
   return tokens.sort((a, b) => a.from - b.from);
 }
@@ -479,7 +498,11 @@ export function plainText(text: string, resolver?: NameResolver): string {
         out += t.inner;
         break;
       case 'scripture':
+      case 'date':
         out += text.slice(t.from, t.to);
+        break;
+      case 'embed':
+        out += `“${t.target.replace(/^#/, '')}”`;
         break;
       default:
         break;

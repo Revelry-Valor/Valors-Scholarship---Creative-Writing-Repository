@@ -4294,3 +4294,116 @@ mark.hit {
   color: var(--accent);
   font-weight: 600;
 }
+.cm-date,
+.date-ref {
+  text-decoration: underline dotted color-mix(in srgb, var(--ok) 70%, transparent);
+  text-underline-offset: 3px;
+}
+
+/* ---------- document links and live quotations */
+.cm-chip[data-entity^='doc:']::before,
+.doc-link::before {
+  content: '';
+}
+.cm-chip[data-entity^='doc:'] {
+  border-style: dashed;
+}
+.cm-embed,
+.embed-card {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 4px 0;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--chip, var(--accent));
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 0.92em;
+  line-height: 1.5;
+  vertical-align: top;
+  white-space: normal;
+}
+.cm-embed.block,
+.embed-card.block {
+  border-left-color: color-mix(in srgb, var(--accent) 50%, var(--line));
+  font-style: italic;
+}
+.cm-embed.missing,
+.embed-card.missing {
+  border-left-color: var(--danger);
+  color: var(--danger);
+}
+.cm-embed-title,
+.embed-title {
+  font: 600 1.05em var(--serif);
+  color: var(--ink);
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  align-self: flex-start;
+}
+.cm-embed-title:hover,
+.embed-title:hover {
+  text-decoration: underline;
+}
+.cm-embed-type,
+.embed-type {
+  font: 600 10.5px var(--sans);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--chip, var(--accent));
+}
+.cm-embed-src,
+.embed-src {
+  align-self: flex-end;
+  font: 12px var(--sans);
+  font-style: normal;
+  color: var(--muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.cm-embed-facts,
+.embed-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px 12px;
+  font: 12.5px var(--sans);
+}
+.embed-fact {
+  display: contents;
+}
+.cm-embed-facts .k,
+.embed-facts .k {
+  color: var(--muted);
+}
+.cm-embed-key,
+.embed-key {
+  font-size: 0.95em;
+  color: var(--ink-soft);
+}
+.doc-backlinks {
+  margin: 0 0 12px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+}
+.doc-backlinks ul {
+  list-style: none;
+  padding: 0;
+  margin: 6px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.doc-backlink-text {
+  font: 14px/1.5 var(--serif);
+  color: var(--ink-soft);
+  margin-left: 18px;
+}

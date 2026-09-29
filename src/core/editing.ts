@@ -37,6 +37,8 @@ export const QUICK_REFERENCE: Array<{ syntax: string; meaning: string; example: 
   { syntax: '@Name::Section', meaning: 'File into a specific profile section', example: '@Scouch::Writings' },
   { syntax: '@-Name', meaning: 'Remove the section owner from this block', example: 'An aside. @-Scouch' },
   { syntax: '[[Name]]', meaning: 'Link without tagging (not filed to the profile)', example: 'see [[On the Vine]]' },
+  { syntax: '[[Document title]]', meaning: 'Link to one of your documents; it lists this one under “Linked from”', example: 'see [[Sermon notes on the Papacy]]' },
+  { syntax: '![[Page or document]]', meaning: 'Live quotation: a card with the page’s summary and facts, or the document’s opening (❝ Quote into… does it for you)', example: '![[First Vatican Council]]' },
   { syntax: '{field: value}', meaning: 'Set a field on the last tagged entity', example: '@Pineapple {died: 1351}' },
   { syntax: '{Name.field: value}', meaning: 'Set a field on a named entity', example: '{Scouch.born: c. 1280}' },
   { syntax: '{year: 1313}', meaning: 'Date the event this block describes', example: 'in {year: 1313}' },

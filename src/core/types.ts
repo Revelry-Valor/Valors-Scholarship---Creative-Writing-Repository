@@ -166,6 +166,10 @@ export interface BlockRecord {
   marks: string[];
   /** Phrases marked important inside the paragraph (`!!…!!`). */
   keyPhrases: string[];
+  /** Documents this paragraph links to ([[Title]]) or quotes (![[Title]]). */
+  docLinks?: string[];
+  /** Live quotations in this paragraph. */
+  embeds?: Array<{ kind: 'block' | 'entity' | 'document' | 'missing'; id: string }>;
   /** Scripture references found in the paragraph. */
   scripture: Array<{ book: string; chapter: number; verseStart?: number; verseEnd?: number; chapterEnd?: number; onward?: boolean; label: string; quoted: boolean; compare: boolean }>;
 }
@@ -187,6 +191,8 @@ export interface EntityChip {
   type: string;
   typeName: string;
   aliases: string[];
+  /** Names worked out from the profile, like "6th Pope" from Office + Number in office. */
+  autoAliases?: string[];
   color: string;
 }
 

@@ -270,8 +270,14 @@ export function buildProfile(v: Vault, entityId: string): ProfileView {
       }
       return {
         name,
+        // Dated documents in date order (a list of sermons sorts itself), then the rest as written.
         groups: [...groups.entries()]
-          .sort(([a], [b]) => (firstWritten.get(a) ?? '').localeCompare(firstWritten.get(b) ?? ''))
+          .sort(([a, la], [b, lb]) => {
+            const da = Math.min(...la.map((x) => x.eventDate?.sort ?? Infinity));
+            const db = Math.min(...lb.map((x) => x.eventDate?.sort ?? Infinity));
+            if (da !== db) return da - db;
+            return (firstWritten.get(a) ?? '').localeCompare(firstWritten.get(b) ?? '');
+          })
           .map(([, list]) => {
             const views = list.sort((a, b) => a.position - b.position).map((b) => blockView(v, b, entityId));
             return { source: views[0].source, blocks: views };

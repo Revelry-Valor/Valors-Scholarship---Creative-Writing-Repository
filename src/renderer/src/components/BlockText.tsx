@@ -1,6 +1,8 @@
 // Renders a block's markup as reading text with chips (used on profiles and in search).
 import type { ReactNode } from 'react';
 import { tokenize } from '../../../core/markup';
+import { formatDateSort } from '../../../core/dates';
+import { EmbedCard } from './EmbedCard';
 import { useApp } from '../state';
 
 function inlineMarkdown(text: string, keyBase: string): ReactNode[] {
@@ -98,9 +100,21 @@ export function BlockText({ text, onOpenEntity, highlights }: { text: string; on
           );
           return;
         }
+        case 'embed':
+          parts.push(<EmbedCard key={key} target={t.target} />);
+          return;
         case 'link': {
           const r = app.names.resolve(t.name);
           const e = r.status === 'ok' ? app.entityById.get(r.id) : undefined;
+          const doc = e ? undefined : app.analysisContext().documentByTitle?.(t.name);
+          if (doc) {
+            parts.push(
+              <button key={key} className="link-chip doc-link" onClick={() => app.openTab({ kind: 'entry', id: doc })} title={`Document: ${t.name}`}>
+                📄 {t.display ?? t.name}
+              </button>,
+            );
+            return;
+          }
           parts.push(
             <button key={key} className="link-chip" onClick={() => e && open(e.id)} title={e ? `${e.name} (link)` : 'No such entity'}>
               {t.display ?? t.name}
@@ -127,7 +141,14 @@ export function BlockText({ text, onOpenEntity, highlights }: { text: string; on
         case 'code':
           parts.push(<code key={key}>{body.slice(t.from + 1, t.to - 1)}</code>);
           return;
-        case 'scripture':
+        case 'date':
+        parts.push(
+          <span key={key} className="date-ref" title={`Date: ${formatDateSort(t.date.sort)}`}>
+            {body.slice(t.from, t.to)}
+          </span>,
+        );
+        return;
+      case 'scripture':
           parts.push(
             <span key={key} className={`scripture-ref ${t.ref.quoted ? 'quoted' : ''}`} title={`${t.ref.label}${t.ref.quoted ? ' · quoted' : ''}${t.ref.compare ? ' · compare' : ''}`}>
               {body.slice(t.from, t.to)}

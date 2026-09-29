@@ -14,7 +14,7 @@ export type Found = ScanResult['suggestions'][number];
 type App = ReturnType<typeof useApp>;
 type Dialogs = ReturnType<typeof useDialogs>;
 
-const KIND_ICON: Record<SuggestionKind, string> = { mention: '@', ambiguous: '?', keyword: '⌗', theme: '✦', scripture: '✝', major: '★', 'new-name': '+' };
+const KIND_ICON: Record<SuggestionKind, string> = { mention: '@', ambiguous: '?', keyword: '⌗', theme: '✦', scripture: '✝', major: '★', 'new-name': '+', activity: '✎' };
 const kindLabel = (k: SuggestionKind) => SUGGESTION_KINDS.find((x) => x.id === k)?.label ?? k;
 
 /** Open the review queue for part of the project. */
@@ -86,6 +86,7 @@ export function SuggestionCard({ s, compact, focused, onFocus, onResolved }: { s
       e.preventDefault();
       if (s.kind === 'ambiguous') void otherPage();
       else if (s.kind === 'new-name') void accept({ type });
+      else if (s.kind === 'activity') void accept({ section: s.section });
       else void accept();
     } else if (k === 'x' || k === 'delete') {
       e.preventDefault();
@@ -114,6 +115,23 @@ export function SuggestionCard({ s, compact, focused, onFocus, onResolved }: { s
         <BlockText text={s.text} highlights={s.spans} />
       </div>
       <footer className="sg-actions">
+        {s.kind === 'activity' && target && (
+          <>
+            <button className="btn small btn-primary" disabled={busy} onClick={() => accept({ section: s.section })} title="A">
+              <span className="dot" style={{ background: target.color }} /> File under {s.section} on {target.name}
+            </button>
+            <button
+              className="btn small"
+              disabled={busy}
+              onClick={async () => {
+                const section = await dialogs.prompt({ title: `Which section of ${target.name}?`, initial: s.section, okLabel: 'File' });
+                if (section) await accept({ section });
+              }}
+            >
+              Other section…
+            </button>
+          </>
+        )}
         {s.kind === 'major' && (
           <button className="btn small btn-primary" disabled={busy} onClick={() => accept()}>
             ★ Mark important
@@ -160,7 +178,7 @@ export function SuggestionCard({ s, compact, focused, onFocus, onResolved }: { s
             ) : null}
           </>
         )}
-        {s.kind !== 'major' && s.kind !== 'new-name' && (
+        {s.kind !== 'major' && s.kind !== 'new-name' && s.kind !== 'activity' && (
           <button className="btn small btn-ghost" disabled={busy} onClick={otherPage}>
             Other page…
           </button>

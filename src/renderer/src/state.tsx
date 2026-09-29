@@ -2,6 +2,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { api, onBackendEvent, type ApiResult } from './api';
 import { NameTable } from '../../core/names';
+import { normalizeName } from '../../core/markup';
 import type { AnalysisContext } from '../../core/analysis';
 import type { EntityChip, ResolvedTemplate, RelationTypeDef } from '../../core/types';
 import type { BackendEvent } from '../../backend/backend';
@@ -122,7 +123,8 @@ export function AppProvider({ info: initialInfo, children }: { info: VaultInfo; 
     return onBackendEvent((e) => {
       setLastEvent(e);
       if (e.type === 'changed') {
-        if (e.entities) refreshNames();
+        // Documents can be linked by title, so a new or renamed document refreshes the name list too.
+        if (e.entities || e.binder) refreshNames();
         else api.vaultInfo().then(setInfo);
         setVersion((n) => n + 1);
       }
@@ -182,16 +184,18 @@ export function AppProvider({ info: initialInfo, children }: { info: VaultInfo; 
 
   const derived = useMemo(() => {
     if (!nameData) return null;
-    const names = new NameTable(nameData.entities.map((e) => ({ id: e.id, name: e.name, aliases: e.aliases, type: e.type })));
+    const names = new NameTable(nameData.entities.map((e) => ({ id: e.id, name: e.name, aliases: [...e.aliases, ...(e.autoAliases ?? [])], type: e.type })));
     const entityById = new Map(nameData.entities.map((e) => [e.id, e]));
     const templates = new Map(nameData.templates.map((t) => [t.id, t]));
     const relationTypes = new Map(nameData.relationTypes.map((r) => [r.id, r]));
+    const documentIds = new Map((nameData.documents ?? []).map((d) => [normalizeName(d.title), d.id]));
     const analysisContext = (directOwner?: string): AnalysisContext => ({
       resolver: names,
       templates,
       relationTypes,
       entityType: (id) => entityById.get(id)?.type,
       directOwner,
+      documentByTitle: (title) => documentIds.get(normalizeName(title)),
     });
     return { names, entityById, templates, relationTypes, analysisContext };
   }, [nameData]);

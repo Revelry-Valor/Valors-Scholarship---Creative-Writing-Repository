@@ -14,6 +14,8 @@ export interface AnalysisContext {
   entityType(id: string): string | undefined;
   /** For an entity file: every block is filed to this entity directly. */
   directOwner?: string;
+  /** Your documents, so [[Document title]] links to a document when no page has that name. */
+  documentByTitle?(title: string): string | undefined;
 }
 
 export interface BlockInput {
@@ -45,6 +47,10 @@ export interface AnalyzedBlock {
   scripture: Array<{ book: string; chapter: number; verseStart?: number; verseEnd?: number; chapterEnd?: number; onward?: boolean; label: string; quoted: boolean; compare: boolean }>;
   /** Title of the nearest heading above (or this heading's own title). */
   headingTitle?: string;
+  /** Documents linked with [[Document title]]. */
+  docLinks: string[];
+  /** Live quotations: ![[Page]], ![[Document]], ![[#b-id]]. */
+  embeds: Array<{ kind: 'block' | 'entity' | 'document' | 'missing'; id: string }>;
 }
 
 interface StackEntry {
@@ -85,6 +91,8 @@ function analyzeOne(b: BlockInput, stack: StackEntry[], ctx: AnalysisContext): A
   const marks: string[] = [];
   const keyPhrases: string[] = [];
   const scripture: AnalyzedBlock['scripture'] = [];
+  const docLinks: string[] = [];
+  const embeds: AnalyzedBlock['embeds'] = [];
 
   const level = b.kind === 'heading' ? b.headingLevel ?? headingLevel(text) : 0;
   let ownTitle: string | undefined;
@@ -120,8 +128,29 @@ function analyzeOne(b: BlockInput, stack: StackEntry[], ctx: AnalysisContext): A
       }
       case 'link': {
         const r = ctx.resolver.resolve(t.name);
+        const doc = r.status === 'ok' ? undefined : ctx.documentByTitle?.(t.name);
         if (r.status === 'ok') links.push(r.id);
-        else warnings.push({ from: t.from, to: t.to, code: r.status === 'ambiguous' ? 'ambiguous-tag' : 'unresolved-tag', message: `No single entity named "${t.name}"` });
+        else if (doc) docLinks.push(doc);
+        else warnings.push({ from: t.from, to: t.to, code: r.status === 'ambiguous' ? 'ambiguous-tag' : 'unresolved-tag', message: `No page or document named "${t.name}"` });
+        break;
+      }
+      case 'embed': {
+        if (/^#b-[a-z0-9]+$/.test(t.target)) {
+          embeds.push({ kind: 'block', id: t.target.slice(1) });
+          break;
+        }
+        const r = ctx.resolver.resolve(t.target);
+        const doc = r.status === 'ok' ? undefined : ctx.documentByTitle?.(t.target);
+        if (r.status === 'ok') {
+          embeds.push({ kind: 'entity', id: r.id });
+          links.push(r.id);
+        } else if (doc) {
+          embeds.push({ kind: 'document', id: doc });
+          docLinks.push(doc);
+        } else {
+          embeds.push({ kind: 'missing', id: t.target });
+          warnings.push({ from: t.from, to: t.to, code: 'unresolved-tag', message: `Nothing named "${t.target}" to quote` });
+        }
         break;
       }
       case 'pin':
@@ -232,6 +261,13 @@ function analyzeOne(b: BlockInput, stack: StackEntry[], ctx: AnalysisContext): A
     }
   }
 
+  // A date written in the text ("May 4th 2026", "Jan/21/2024") dates the paragraph
+  // when no {date: …} was given, so profiles and timelines put it in order.
+  if (!eventDate) {
+    const d = tokens.find((x) => x.kind === 'date');
+    if (d && d.kind === 'date') eventDate = { text: d.date.text, sort: d.date.sort };
+  }
+
   // Relationships: @A >relation> @B
   const relations: RelationRecord[] = [];
   for (let i = 0; i < tokens.length; i++) {
@@ -306,6 +342,8 @@ function analyzeOne(b: BlockInput, stack: StackEntry[], ctx: AnalysisContext): A
     keyPhrases,
     scripture,
     headingTitle: nearestTitle,
+    docLinks: [...new Set(docLinks)],
+    embeds,
   };
 }
 

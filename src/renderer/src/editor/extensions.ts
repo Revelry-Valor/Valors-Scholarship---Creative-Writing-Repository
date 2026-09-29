@@ -5,13 +5,15 @@
 //  - warning underlines for broken markup (spec 4.1 mistake-proofing)
 //  - the `@` menu and `{` / `>` / `#` pickers (spec 4.1)
 
+import { formatDateSort } from '../../../core/dates';
 import { Decoration, EditorView, GutterMarker, ViewPlugin, WidgetType, gutter, type DecorationSet, type ViewUpdate } from '@codemirror/view';
 import { EditorState, RangeSet, RangeSetBuilder, StateEffect, StateField, Transaction, type Extension, type Range } from '@codemirror/state';
 import { autocompletion, type Completion, type CompletionContext, type CompletionResult, startCompletion } from '@codemirror/autocomplete';
 import { analyzeBlocks, type AnalysisContext, type AnalyzedBlock } from '../../../core/analysis';
 import { splitBlocks, type ParsedBlock } from '../../../core/document';
 import { factPickerFields } from '../../../core/editing';
-import { formatTag, normalizeName, type Token } from '../../../core/markup';
+import { formatTag, normalizeName, plainText, type Token } from '../../../core/markup';
+import { api, onBackendEvent } from '../api';
 import type { EntityChip, ResolvedTemplate, RelationTypeDef } from '../../../core/types';
 
 export interface EditorEnv {
@@ -23,7 +25,9 @@ export interface EditorEnv {
   topicType: string;
   directOwner?: string;
   raw: boolean;
+  /** Opens a page by id, or `doc:<id>` a document, or `src:<kind>:<id>:<block>` a paragraph where it lives. */
   openEntity(id: string): void;
+  documents?: Array<{ id: string; title: string }>;
   createEntity(name: string, type: string): Promise<void>;
   onCurrentBlock?(b: (ParsedBlock & { analysis: AnalyzedBlock }) | null): void;
 }
@@ -104,6 +108,97 @@ class ChipWidget extends WidgetType {
   }
   ignoreEvent() {
     return false;
+  }
+}
+
+// Live quotations (![[…]]): the card shows the current text of the paragraph, page or document.
+let embedRev = 0;
+const previews = new Map<string, ReturnType<typeof api.embedPreview>>();
+onBackendEvent((e) => {
+  if (e.type === 'changed') {
+    previews.clear();
+    embedRev++;
+  }
+});
+
+function openFrom(view: EditorView, id: string) {
+  view.state.field(envField, false)?.openEntity(id);
+}
+
+class EmbedWidget extends WidgetType {
+  constructor(
+    readonly target: string,
+    readonly rev: number,
+  ) {
+    super();
+  }
+  eq(o: EmbedWidget) {
+    return o.target === this.target && o.rev === this.rev;
+  }
+  toDOM(view: EditorView) {
+    const box = document.createElement('span');
+    box.className = 'cm-embed';
+    box.textContent = 'Loading quotation…';
+    let p = previews.get(this.target);
+    if (!p) {
+      p = api.embedPreview(this.target);
+      previews.set(this.target, p);
+    }
+    p.then((pv) => {
+      box.textContent = '';
+      const el = (tag: string, cls: string, text?: string) => {
+        const n = document.createElement(tag);
+        n.className = cls;
+        if (text !== undefined) n.textContent = text;
+        return n;
+      };
+      if (pv.kind === 'missing') {
+        box.classList.add('missing');
+        box.append(el('span', 'cm-embed-title', `Nothing to quote: “${pv.title}”`));
+        return;
+      }
+      if (pv.kind === 'block') {
+        box.classList.add('block');
+        box.append(el('span', 'cm-embed-text', plainText(pv.text)));
+        const src = el('button', 'cm-embed-src', `— ${pv.source.title}`);
+        src.onmousedown = (ev) => {
+          ev.preventDefault();
+          openFrom(view, `src:${pv.source.kind}:${pv.source.id}:${pv.id}`);
+        };
+        box.append(src);
+        return;
+      }
+      if (pv.kind === 'entity') {
+        box.classList.add('entity');
+        box.style.setProperty('--chip', pv.color);
+        const head = el('button', 'cm-embed-title', pv.title);
+        head.onmousedown = (ev) => {
+          ev.preventDefault();
+          openFrom(view, pv.id);
+        };
+        box.append(head, el('span', 'cm-embed-type', pv.typeName));
+        if (pv.summary) box.append(el('span', 'cm-embed-text', pv.summary));
+        if (pv.facts.length) {
+          const dl = el('span', 'cm-embed-facts');
+          for (const f of pv.facts) dl.append(el('span', 'k', f.label), el('span', 'v', f.value));
+          box.append(dl);
+        }
+        for (const k of pv.key) box.append(el('span', 'cm-embed-key', `★ ${k}`));
+        return;
+      }
+      box.classList.add('document');
+      const head = el('button', 'cm-embed-title', `📄 ${pv.title}`);
+      head.onmousedown = (ev) => {
+        ev.preventDefault();
+        openFrom(view, `doc:${pv.id}`);
+      };
+      box.append(head);
+      if (pv.text) box.append(el('span', 'cm-embed-text', pv.text));
+    });
+    return box;
+  }
+  ignoreEvent() {
+    return true;
   }
 }
 
@@ -221,6 +316,10 @@ function buildDecorations(view: EditorView): { all: DecorationSet; atomic: Decor
         if (t.kind === 'unclosed') ranges.push(Decoration.mark({ class: 'cm-warn', attributes: { title: `Unclosed ${t.what}` } }).range(from, to));
         continue;
       }
+      if (t.kind === 'date') {
+        ranges.push(Decoration.mark({ class: 'cm-date', attributes: { title: `Date: ${formatDateSort(t.date.sort)} — this paragraph is placed in date order on its pages and timelines` } }).range(from, to));
+        continue;
+      }
       if (t.kind === 'scripture') {
         ranges.push(Decoration.mark({ class: `cm-scripture${t.ref.quoted ? ' quoted' : ''}`, attributes: { title: `${t.ref.label}${t.ref.quoted ? ' · quoted' : ''}${t.ref.compare ? ' · compare' : ''}` } }).range(from, to));
         continue;
@@ -276,9 +375,13 @@ function describeToken(t: Token, env: EditorEnv, warning?: string): { widget: Wi
         color: e?.color ?? 'var(--accent)',
       };
     }
+    case 'embed':
+      return { widget: new EmbedWidget(t.target, embedRev), color: 'var(--accent)' };
     case 'link': {
       const r = env.ctx.resolver.resolve(t.name);
       const e = r.status === 'ok' ? env.entities.get(r.id) : undefined;
+      const doc = e ? undefined : env.ctx.documentByTitle?.(t.name);
+      if (doc) return { widget: new ChipWidget(t.display ?? t.name, 'var(--ink-soft)', 'link', 'ok', `doc:${doc}`, `Document: ${t.name} (Ctrl+click to open)`), color: 'var(--ink-soft)' };
       return {
         widget: new ChipWidget(t.display ?? t.name, e?.color ?? 'var(--danger)', 'link', e ? 'ok' : 'missing', e?.id, e ? `Link to ${e.name} (not filed to the profile)` : warning ?? 'No such entity'),
         color: e?.color ?? 'var(--danger)',
@@ -494,15 +597,41 @@ export function openEntityAtCursor(view: EditorView): boolean {
   const rel = view.state.selection.main.head - b.from;
   for (const t of b.analysis.tokens) {
     if (rel < t.from || rel > t.to) continue;
-    const name = t.kind === 'tag' ? t.name : t.kind === 'topic' || t.kind === 'link' ? t.name : null;
+    const name = t.kind === 'tag' ? t.name : t.kind === 'topic' || t.kind === 'link' ? t.name : t.kind === 'embed' ? t.target : null;
     if (!name) continue;
     const r = env.ctx.resolver.resolve(name);
     if (r.status === 'ok') {
       env.openEntity(r.id);
       return true;
     }
+    const doc = env.ctx.documentByTitle?.(name);
+    if (doc) {
+      env.openEntity(`doc:${doc}`);
+      return true;
+    }
   }
   return false;
+}
+
+// ------------------------------------------------------------------ [[ links and ![[ quotations
+
+function linkCompletions(context: CompletionContext): CompletionResult | null {
+  const env = context.state.field(envField, false);
+  if (!env) return null;
+  const m = context.matchBefore(/!?\[\[[^\]\n|]{0,60}$/);
+  if (!m) return null;
+  const quote = m.text.startsWith('!');
+  const from = m.from + (quote ? 3 : 2);
+  const q = normalizeName(context.state.sliceDoc(from, context.pos));
+  const options: Completion[] = [];
+  const add = (label: string, detail: string, boost: number) => {
+    const k = normalizeName(label);
+    if (q && !k.includes(q)) return;
+    options.push({ label, detail, boost: boost + (k.startsWith(q) ? 10 : 0), apply: (view) => view.dispatch({ changes: { from, to: context.pos, insert: `${label}]]` }, selection: { anchor: from + label.length + 2 } }) });
+  };
+  for (const d of env.documents ?? []) add(d.title, quote ? '📄 quote this document' : '📄 document', 20);
+  for (const e of env.entities.values()) add(e.name, quote ? `quote ${e.typeName} page` : e.typeName, 0);
+  return options.length ? { from, options, filter: false } : null;
 }
 
 // ------------------------------------------------------------------ the @ menu
@@ -625,7 +754,7 @@ function atCompletions(context: CompletionContext): CompletionResult | null {
       if (e.type === env.topicType && !q) continue;
       let best = 0;
       let via: string | undefined;
-      for (const n of [e.name, ...e.aliases]) {
+      for (const n of [e.name, ...e.aliases, ...(e.autoAliases ?? [])]) {
         const k = normalizeName(n);
         let s = 0;
         if (!q) s = 1;
@@ -768,7 +897,7 @@ export function writingExtensions(opts: { stripe?: boolean } = {}): Extension[] 
     clickHandlers,
     openFactPicker,
     autocompletion({
-      override: [atCompletions, fieldCompletions, relationCompletions, topicCompletions],
+      override: [linkCompletions, atCompletions, fieldCompletions, relationCompletions, topicCompletions],
       icons: false,
       activateOnTyping: true,
       closeOnBlur: true,
