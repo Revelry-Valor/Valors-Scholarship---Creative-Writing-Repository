@@ -123,7 +123,15 @@ export function Editor(props: EditorProps) {
       topicType: a.templates.has('topic') ? 'topic' : '',
       directOwner: propsRef.current.directOwner,
       raw: a.rawMarkup,
-      openEntity: (id) => a.openTab({ kind: 'entity', id }),
+      documents: a.nameData.documents,
+      openEntity: (id) => {
+        if (id.startsWith('doc:')) return a.openTab({ kind: 'entry', id: id.slice(4) });
+        if (id.startsWith('src:')) {
+          const [, kind, sid, block] = id.split(':');
+          return a.openTab({ kind: kind as 'entry', id: sid, focusBlock: block });
+        }
+        a.openTab({ kind: 'entity', id });
+      },
       createEntity: async (name, type) => {
         try {
           await api.createEntity({ name, type });
@@ -165,7 +173,7 @@ export function Editor(props: EditorProps) {
     if (saving.current) await saving.current;
     const run = (async () => {
       let text = view.state.doc.toString();
-      if (text === lastSaved.current) {
+      if (stripEnd(text) === lastSaved.current) {
         app.setSaveState('saved');
         return;
       }
@@ -197,12 +205,12 @@ export function Editor(props: EditorProps) {
       }
       try {
         const res = await propsRef.current.onSave(propsRef.current.mode === 'document' && text ? `${text}\n` : text);
-        lastSaved.current = res ? stripEnd(res.body) : text;
+        lastSaved.current = res ? stripEnd(res.body) : stripEnd(text);
         if (res && res.changed && view.state.doc.toString() === text) {
           view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: stripEnd(res.body) }, annotations: internal.of('reload') });
         }
         rememberBlocks(view);
-        app.setSaveState(view.state.doc.toString() === lastSaved.current ? 'saved' : 'unsaved');
+        app.setSaveState(stripEnd(view.state.doc.toString()) === lastSaved.current ? 'saved' : 'unsaved');
       } catch (err) {
         app.setSaveState('error');
         app.notify(`Could not save: ${(err as Error).message}`, 'error');
@@ -297,7 +305,7 @@ export function Editor(props: EditorProps) {
     return () => {
       if (lastDocView === view) lastDocView = null;
       clearTimeout(timer.current);
-      if (!isBlock && view.state.doc.toString() !== lastSaved.current) void propsRef.current.onSave(`${view.state.doc.toString()}\n`);
+      if (!isBlock && stripEnd(view.state.doc.toString()) !== lastSaved.current) void propsRef.current.onSave(`${view.state.doc.toString()}\n`);
       view.destroy();
       viewRef.current = null;
     };
@@ -315,7 +323,7 @@ export function Editor(props: EditorProps) {
     const view = viewRef.current;
     if (!view || !props.external) return;
     const body = stripEnd(props.external.body);
-    const cur = view.state.doc.toString();
+    const cur = stripEnd(view.state.doc.toString());
     if (body === cur || body === lastSaved.current) return;
     if (cur !== lastSaved.current) return; // unsaved local edits win; they save next
     let a = 0;

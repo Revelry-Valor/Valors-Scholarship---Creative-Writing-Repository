@@ -7,6 +7,7 @@ import { useDialogs } from './Dialogs';
 import { BlockText } from './BlockText';
 import { afterImport, openReview } from './Review';
 import { addAsEvidence } from './Claims';
+import { quoteInto } from './QuoteInto';
 
 type Lib = ApiResult<'listLibrary'>;
 type Doc = ApiResult<'getLibraryDoc'>;
@@ -388,6 +389,9 @@ export function LibraryReader({ id, focusBlock }: { id: string; focusBlock?: str
                   </button>
                   <button className="foot-btn" onClick={() => api.annotateLibraryBlock(b.id, { mark: 'check' })} title="Mark to check">
                     ⚑
+                  </button>
+                  <button className="foot-btn" onClick={() => quoteInto(app, dialogs, `#${b.id}`, 'this passage')} title="Quote this passage, live, into one of your documents">
+                    ❝
                   </button>
                   <button className="foot-btn" onClick={() => addAsEvidence(app, dialogs, b.id)} title="Evidence for or against a claim, or make it a claim">
                     ⚖

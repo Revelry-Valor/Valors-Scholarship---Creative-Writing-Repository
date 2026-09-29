@@ -17,6 +17,7 @@
 // Markdown files are the source of truth. Everything else in this class is an
 // in-memory index built from them, and can be rebuilt at any time.
 
+import { autoAliases } from './ordinals';
 import { promises as fs, existsSync } from 'node:fs';
 import path from 'node:path';
 import YAML from 'yaml';
@@ -114,6 +115,8 @@ export interface VaultInfo {
 
 export interface NameData {
   entities: EntityChip[];
+  /** Your documents, for [[Document title]] links. */
+  documents: Array<{ id: string; title: string }>;
   templates: ResolvedTemplate[];
   relationTypes: RelationTypeDef[];
   settings: VaultSettings;
@@ -510,7 +513,7 @@ export class Vault {
   }
 
   private rebuildNames() {
-    this.names = new NameTable([...this.entities.values()].map((e) => ({ id: e.id, name: e.name, aliases: e.aliases, type: e.type })));
+    this.names = new NameTable([...this.entities.values()].map((e) => ({ id: e.id, name: e.name, aliases: [...e.aliases, ...autoAliases(e.fields)], type: e.type })));
   }
 
   analysisContext(directOwner?: string): AnalysisContext {
@@ -520,7 +523,84 @@ export class Vault {
       relationTypes: this.relationTypes,
       entityType: (id) => this.entities.get(id)?.type,
       directOwner,
+      documentByTitle: (title) => {
+        const k = normalizeName(title);
+        for (const e of this.entries.values()) if (normalizeName(e.title) === k) return e.id;
+        return undefined;
+      },
     };
+  }
+
+  // ---------------------------------------------------------------- links between documents
+
+  /** Add a paragraph at the end of a document (used by "Quote into…"). */
+  appendToEntry(id: string, paragraph: string) {
+    return this.exclusive(async () => {
+      const e = this.entries.get(id);
+      if (!e) throw new Error('No such document');
+      const st = this.files.get(e.file)!;
+      const body = `${st.body.replace(/\s+$/, '')}${st.body.trim() ? '\n\n' : ''}${paragraph.trim()}\n`;
+      return this.saveBody(e.file, body);
+    });
+  }
+
+  /** Paragraphs (in other documents or pages) that link to or quote this document. */
+  documentBacklinks(entryId: string) {
+    const out: Array<{ id: string; text: string; quoted: boolean; source: { kind: DocKind; id: string; title: string } }> = [];
+    for (const b of this.blocks.values()) {
+      if (b.owner.kind === 'entry' && b.owner.id === entryId) continue;
+      const linked = b.docLinks?.includes(entryId);
+      const quoted = b.embeds?.some((x) => x.kind === 'document' && x.id === entryId) ?? false;
+      // Quoting one of this document's paragraphs counts too.
+      const quotesPara = b.embeds?.some((x) => x.kind === 'block' && this.blocks.get(x.id)?.owner.id === entryId) ?? false;
+      if (!linked && !quotesPara) continue;
+      out.push({ id: b.id, text: b.text, quoted: quoted || quotesPara, source: { kind: b.owner.kind, id: b.owner.id, title: this.sourceTitle(b) } });
+    }
+    return out.sort((a, b) => a.source.title.localeCompare(b.source.title));
+  }
+
+  /** What a live quotation shows: a paragraph, a page's summary and facts, or a document's opening. */
+  embedPreview(target: string) {
+    const t = target.trim();
+    if (/^#b-[a-z0-9]+$/.test(t)) {
+      const b = this.blocks.get(t.slice(1));
+      if (!b) return { kind: 'missing' as const, title: 'A paragraph that was deleted' };
+      return { kind: 'block' as const, id: b.id, text: b.text, source: { kind: b.owner.kind, id: b.owner.id, title: this.sourceTitle(b) } };
+    }
+    const r = this.names.resolve(t);
+    if (r.status === 'ok') {
+      const e = this.entities.get(r.id)!;
+      const chip = this.chip(e);
+      const tpl = this.template(e.type);
+      const facts: Array<{ label: string; value: string }> = [];
+      for (const fd of tpl.fields) {
+        const vals = new Set<string>();
+        const raw = e.fields?.[fd.key];
+        for (const x of Array.isArray(raw) ? raw : raw !== undefined && raw !== null && raw !== '' ? [raw] : []) vals.add(String(x).replace(/^@+\[?|\]$/g, ''));
+        for (const b of this.blocks.values()) for (const fa of b.fields) if (fa.entityId === e.id && fa.field === fd.key) vals.add(fa.valueText.replace(/^@+\[?|\]$/g, ''));
+        if (vals.size) facts.push({ label: fd.label, value: [...vals].join(' / ') });
+      }
+      const pinned = [...this.blocks.values()].find((b) => b.pinned && b.filedTo.some((f) => f.entityId === e.id));
+      const key = [...this.blocks.values()].filter((b) => b.marks.includes('key') && b.filedTo.some((f) => f.entityId === e.id)).slice(0, 3);
+      return {
+        kind: 'entity' as const,
+        id: e.id,
+        title: e.name,
+        typeName: chip.typeName,
+        color: chip.color,
+        summary: e.summary || (pinned ? plainText(pinned.text, this.names) : ''),
+        facts: facts.slice(0, 8),
+        key: key.map((b) => plainText(b.text, this.names)),
+      };
+    }
+    const docId = this.analysisContext().documentByTitle!(t);
+    if (docId) {
+      const e = this.entries.get(docId)!;
+      const st = this.files.get(e.file)!;
+      const paras = st.blocks.filter((b) => b.kind !== 'heading' && b.text.trim()).slice(0, 2);
+      return { kind: 'document' as const, id: docId, title: e.title, text: paras.map((b) => plainText(b.text, this.names)).join('\n\n') };
+    }
+    return { kind: 'missing' as const, title: t };
   }
 
   private pending: PendingCreate[] = [];
@@ -556,6 +636,8 @@ export class Vault {
         marks: a.marks,
         keyPhrases: a.keyPhrases,
         scripture: a.scripture,
+        docLinks: a.docLinks,
+        embeds: a.embeds,
       });
     });
   }
@@ -736,7 +818,25 @@ export class Vault {
       const b = this.getBlock(s.blockId);
       let text = b.text;
       let createdPage: EntityRecord | undefined;
-      if (s.kind === 'major') {
+      if (s.kind === 'activity') {
+        const entityId = s.entityIds[0];
+        const e = this.entities.get(entityId);
+        if (!e) throw new Error('No such page');
+        const section = (choice.section ?? s.section ?? '').trim();
+        if (!section) throw new Error('Choose a section');
+        const sec = `::${/\s/.test(section) ? `[${section}]` : section}`;
+        if (b.owner.kind === 'library') {
+          text = `${text.trimEnd()} ${formatTag(e.name)}${sec}`;
+        } else {
+          // Give the doer's tag a section: @Dr James White → @Dr James White::Sermons
+          const tag = tokenize(text, this.names).find((t): t is TagToken => t.kind === 'tag' && !t.bare && !t.optOut && this.names.resolve(t.name).status === 'ok' && (this.names.resolve(t.name) as { id: string }).id === entityId);
+          if (!tag) throw new Error('The name is no longer in this paragraph.');
+          const name = text.slice(tag.nameFrom, tag.nameTo);
+          const bare = tag.display ? `@[${name}|${tag.display}]` : text.slice(tag.from, tag.nameTo).startsWith('@[') ? `@[${name}]` : `@${text.slice(tag.from + 1, tag.nameTo).replace(/^@/, '')}`;
+          text = text.slice(0, tag.from) + bare + sec + text.slice(tag.to);
+        }
+        await this.ensureSectionHeading(entityId, section);
+      } else if (s.kind === 'major') {
         text = `${text.trimEnd()} !key`;
       } else {
         let entityId = choice.entityId ?? (s.kind === 'ambiguous' ? undefined : s.entityIds[0]);
@@ -775,6 +875,19 @@ export class Vault {
     });
   }
 
+  /** Make sure a page has a heading for a section, so paragraphs filed there show under it. */
+  private async ensureSectionHeading(entityId: string, section: string) {
+    const e = this.entities.get(entityId);
+    if (!e) return;
+    const tpl = this.template(e.type);
+    if (tpl.sections.some((x) => normalizeName(x) === normalizeName(section))) return;
+    const st = this.files.get(e.file);
+    if (!st) return;
+    const has = st.blocks.some((b) => b.kind === 'heading' && normalizeName(b.text.replace(/^#+\s*/, '').replace(/\s*\^b-[a-z0-9]+$/, '')) === normalizeName(section));
+    if (has) return;
+    await this.saveBody(e.file, `${st.body.replace(/\s+$/, '')}${st.body.trim() ? '\n\n' : ''}## ${section}\n`);
+  }
+
   /** Dismiss once, never in this document, or never anywhere. Remembered in .meta/suggestions.json. */
   dismissSuggestion(id: string, mode: 'once' | 'here' | 'everywhere' = 'once') {
     return this.exclusive(async () => {
@@ -806,12 +919,14 @@ export class Vault {
 
   chip(e: EntityRecord): EntityChip {
     const t = this.template(e.type);
-    return { id: e.id, name: e.name, type: e.type, typeName: t.name, aliases: e.aliases, color: colorFor(e.id) };
+    const auto = autoAliases(e.fields);
+    return { id: e.id, name: e.name, type: e.type, typeName: t.name, aliases: e.aliases, ...(auto.length ? { autoAliases: auto } : {}), color: colorFor(e.id) };
   }
 
   nameData(): NameData {
     return {
       entities: [...this.entities.values()].map((e) => this.chip(e)),
+      documents: [...this.entries.values()].map((e) => ({ id: e.id, title: e.title })),
       templates: [...this.templates.values()],
       relationTypes: [...this.relationTypes.values()],
       settings: this.settings,
@@ -919,6 +1034,7 @@ export class Vault {
       if (patch.format !== undefined) st.frontmatter.format = patch.format && Object.keys(patch.format).length ? patch.format : undefined;
       let rel = e.file;
       if (patch.title !== undefined && patch.title.trim() && patch.title !== e.title) {
+        await this.rewriteDocumentLinks(id, e.title, patch.title.trim());
         st.frontmatter.title = patch.title.trim();
         const dir = path.posix.dirname(rel);
         const target = await this.uniquePath(dir, slugify(patch.title));
@@ -936,6 +1052,23 @@ export class Vault {
       this.emit({ files: [rel], entities: false, binder: true });
       return this.getEntry(id);
     });
+  }
+
+  /** Renaming a document keeps [[Old title]] and ![[Old title]] links pointing at it. */
+  private async rewriteDocumentLinks(id: string, from: string, to: string) {
+    const esc = from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(`(!?\\[\\[)\\s*${esc}\\s*(\\|[^\\]]*)?\\]\\]`, 'gi');
+    const files = new Set<string>();
+    for (const b of this.blocks.values()) if (b.docLinks?.includes(id)) files.add(b.file);
+    for (const rel of files) {
+      const st = this.files.get(rel);
+      if (!st) continue;
+      const body = st.body.replace(re, (_m, open: string, shown?: string) => `${open}${to}${shown ?? ''}]]`);
+      if (body !== st.body) {
+        st.body = body;
+        await this.writeRel(rel, stringifyFile(st.frontmatter, body));
+      }
+    }
   }
 
   deleteEntry(id: string) {

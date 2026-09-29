@@ -7,15 +7,17 @@
 //   theme      trigger words from a theme                         canon, received, disputed → Canon of Scripture
 //   scripture  a verse from a book that has its own page          Rom 3:23 → Romans
 //   major      a thesis, verdict, definition or strong claim      → mark ★ important
+//   activity   someone had/gave/preached/wrote a kind of work        → file to their Sermons (Lectures…) section
 //   new-name   a capitalised name used again and again            "Tertullian" is not in your project
 
+import { startsWithOrdinal } from './ordinals';
 import { normalizeName, tokenize } from './markup';
 import type { NameTable } from './names';
 import { compileWords, findWords, majorScore, type CompiledTheme } from './triggers';
 import { BOOKS } from './scripture';
 import type { DocKind } from './types';
 
-export type SuggestionKind = 'mention' | 'ambiguous' | 'keyword' | 'theme' | 'scripture' | 'major' | 'new-name';
+export type SuggestionKind = 'mention' | 'ambiguous' | 'keyword' | 'theme' | 'scripture' | 'major' | 'new-name' | 'activity';
 
 export const SUGGESTION_KINDS: Array<{ id: SuggestionKind; label: string; hint: string }> = [
   { id: 'mention', label: 'Names without @', hint: 'A known name or alias written as plain text' },
@@ -25,11 +27,12 @@ export const SUGGESTION_KINDS: Array<{ id: SuggestionKind; label: string; hint: 
   { id: 'scripture', label: 'Scripture books', hint: 'A verse from a book that has its own page' },
   { id: 'major', label: 'Major statements', hint: 'Theses, verdicts, definitions and strong claims' },
   { id: 'new-name', label: 'New names', hint: 'A capitalised name used more than once that has no page' },
+  { id: 'activity', label: 'Sermons, books, talks…', hint: 'Someone had, gave, preached or wrote something: file it under that kind on their page' },
 ];
 
 export type ScanDetectors = Record<SuggestionKind, boolean>;
 
-export const DEFAULT_DETECTORS: ScanDetectors = { mention: true, ambiguous: true, keyword: true, theme: true, scripture: true, major: true, 'new-name': true };
+export const DEFAULT_DETECTORS: ScanDetectors = { mention: true, ambiguous: true, keyword: true, theme: true, scripture: true, major: true, 'new-name': true, activity: true };
 
 export interface ScanBlock {
   id: string;
@@ -64,6 +67,8 @@ export interface Suggestion {
   themeId?: string;
   /** Page to create (a theme without a page yet, or a new name). */
   create?: string;
+  /** Section of the page to file to ('activity': "Sermons"). */
+  section?: string;
   /** How many times it occurs in the paragraph (or document, for new names). */
   count: number;
   /** Every place in the paragraph to highlight. */
@@ -96,7 +101,7 @@ const COMMON = new Set(
 );
 const BOOK_WORDS = new Set(BOOKS.flatMap((b) => [b.name, ...b.abbr]).map((n) => n.toLowerCase()));
 
-const WORD_RE = /[\p{L}][\p{L}\p{N}'’-]*/gu;
+const WORD_RE = /[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu;
 const isUpper = (c: string) => c !== c.toLowerCase() && c === c.toUpperCase();
 
 /** Ranges of existing markup (tags, facts, scripture…) that the scan must not touch. */
@@ -159,7 +164,7 @@ export function scanBlock(b: ScanBlock, ctx: ScanContext): Suggestion[] {
       const i = m.index;
       let match = ctx.names.matchPrefix(text.slice(i));
       // Lower-case text only counts when the name itself is lower-case ("the Vine Doctor" is fine).
-      if (match && !/\p{Lu}/u.test(match) && /\p{Lu}/u.test(ctx.entities.get((ctx.names.candidates(match)[0] ?? ''))?.name ?? '')) match = null;
+      if (match && !/\p{Lu}/u.test(match) && !startsWithOrdinal(match) && /\p{Lu}/u.test(ctx.entities.get((ctx.names.candidates(match)[0] ?? ''))?.name ?? '')) match = null;
       if (!match && !isUpper(text[i])) continue;
       let partial = false;
       if (!match) {
@@ -248,6 +253,37 @@ export function scanBlock(b: ScanBlock, ctx: ScanContext): Suggestion[] {
     }
   }
 
+  // Someone had / gave / preached a sermon, wrote a book, held a debate…: file it to that
+  // person's page under a section named for the kind of work, so the list builds itself.
+  if (d.activity && !b.heading) {
+    const tags = tokenize(text, ctx.names).filter((t) => t.kind === 'tag' && !t.bare && !t.optOut) as Array<{ from: number; to: number; name: string; section?: string }>;
+    ACTIVITY_RE.lastIndex = 0;
+    for (let m; (m = ACTIVITY_RE.exec(text)); ) {
+      if (inside(ranges, m.index, m.index + m[0].length)) continue;
+      // The doer is the nearest tag before the verb, in the same sentence.
+      const before = tags.filter((t) => t.to <= m!.index && !/[.!?]\s/.test(text.slice(t.to, m!.index)) && m!.index - t.to <= 80);
+      const actor = before[before.length - 1];
+      if (!actor) continue;
+      const r = ctx.names.resolve(actor.name);
+      if (r.status !== 'ok') continue;
+      const section = sectionName(m[2]);
+      if (actor.section && normalizeName(actor.section) === normalizeName(section)) continue;
+      const e = ctx.entities.get(r.id);
+      add({
+        kind: 'activity',
+        target: `${r.id}:${normalizeName(section)}`,
+        blockId: b.id,
+        from: m.index,
+        to: m.index + m[0].length,
+        match: m[0],
+        entityIds: [r.id],
+        section,
+        score: 0.75,
+        why: `${e?.name ?? actor.name}: “${m[0].trim()}” — file this under ${e?.name ?? actor.name}’s ${section}?`,
+      });
+    }
+  }
+
   // Theses, verdicts and strong claims.
   if (d.major && b.docKind !== 'bible' && !b.heading && !b.marks.includes('key')) {
     const { score, why, spans } = majorScore(text);
@@ -255,6 +291,24 @@ export function scanBlock(b: ScanBlock, ctx: ScanContext): Suggestion[] {
   }
 
   return [...out.values()];
+}
+
+const WORKS =
+  'sermons?|lectures?|debates?|talks?|homil(?:y|ies)|podcasts?|episodes?|videos?|books?|articles?|letters?|epistles?|interviews?|class(?:es)?|courses?|series|speech(?:es)?|presentations?|conferences?|livestreams?|streams?|broadcasts?|stud(?:y|ies)|bible stud(?:y|ies)|commentar(?:y|ies)|treatises?|messages?|teachings?|seminars?|workshops?|essays?|papers?|reviews?|responses?|rebuttals?|hymns?|poems?|songs?|prayers?|creeds?|councils?|synods?|campaigns?|battles?|expeditions?|journeys?|missions?';
+const ACTIVITY_RE = new RegExp(
+  `\\b(had|gave|give|gives|preached|preaches|delivered|delivers|held|holds|hosted|hosts|led|leads|taught|teaches|wrote|writes|published|publishes|recorded|records|released|releases|presented|presents|did|does|conducted|conducts|spoke at|spoke in|debated in|called|convened|fought|made|composed|issued)\\s+(?:(?:a|an|the|his|her|their|its|another|one|two|three|several|many|some|new|short|long|public|famous|special|first|second|last|final)\\s+){0,3}(${WORKS})\\b`,
+  'gi',
+);
+
+/** "sermon" → "Sermons", "bible study" → "Bible studies", "series" → "Series". */
+export function sectionName(kind: string): string {
+  let k = kind.toLowerCase().trim();
+  if (!/(s|ies|ches|series)$/.test(k) || k === 'class' || /ss$/.test(k)) {
+    if (/(ch|sh|ss|x)$/.test(k)) k += 'es';
+    else if (/[^aeiou]y$/.test(k)) k = `${k.slice(0, -1)}ies`;
+    else if (k !== 'series') k += 's';
+  }
+  return k.charAt(0).toUpperCase() + k.slice(1);
 }
 
 /** Capitalised names used again and again in one document that have no page. */

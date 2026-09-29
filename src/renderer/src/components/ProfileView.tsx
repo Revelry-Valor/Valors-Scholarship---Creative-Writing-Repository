@@ -8,6 +8,7 @@ import type { EditorView } from '@codemirror/view';
 import { api, type ApiResult } from '../api';
 import { useApp } from '../state';
 import { BlockText } from './BlockText';
+import { quoteInto } from './QuoteInto';
 import { Editor } from '../editor/Editor';
 import { elsewhereExtension, setElsewhere, slotKey } from '../editor/elsewhere';
 import { useDialogs } from './Dialogs';
@@ -138,6 +139,7 @@ export function ProfileView({ id, focusBlock }: { id: string; focusBlock?: strin
               </button>
             </h1>
             <Aliases id={id} aliases={e.aliases} />
+            {e.autoAliases?.length ? <p className="muted small" title="Worked out from Office and Number in office">Also recognized as {e.autoAliases.join(', ')}</p> : null}
             {p.pinned ? (
               <div className="profile-summary pinned">
                 <BlockText text={p.pinned.text} />
@@ -232,6 +234,9 @@ export function ProfileView({ id, focusBlock }: { id: string; focusBlock?: strin
           </div>
 
           <div className="card danger-zone">
+            <button className="btn btn-ghost small" onClick={() => quoteInto(app, dialogs, e.name, 'this page')} title="Put a live card of this page (summary, facts, key details) into one of your documents">
+              ❝ Quote this page into a document…
+            </button>
             <button className="btn btn-ghost small" onClick={editTemplate}>
               Edit the {e.typeName} template…
             </button>
@@ -660,6 +665,9 @@ export function BlockCard({ b, entityId, flat }: { b: BlockView; entityId: strin
           </span>
         )}
         <span className="spacer" />
+        <button className="foot-btn" onClick={() => quoteInto(app, dialogs, `#${b.id}`, 'this paragraph')} title="Quote this paragraph, live, into one of your documents">
+          ❝ Quote into…
+        </button>
         {b.editCount > 0 && (
           <button className="foot-btn" onClick={history} title="See or restore earlier wording">
             edited {b.editCount}×
