@@ -3,6 +3,7 @@ import { app, BrowserWindow, dialog, ipcMain, shell, Menu, session, type MenuIte
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Backend } from '../backend/backend';
+import { setupUpdates } from './updates';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 let win: BrowserWindow | null = null;
@@ -70,6 +71,7 @@ app.whenReady().then(async () => {
     }
   });
   backend.onEvent((e) => win?.webContents.send('backend-event', e));
+  setupUpdates(() => win);
   await createWindow();
 });
 

@@ -9,4 +9,13 @@ contextBridge.exposeInMainWorld('livingRepo', {
     ipcRenderer.on('backend-event', handler);
     return () => ipcRenderer.removeListener('backend-event', handler);
   },
+  // Version and automatic updates.
+  appInfo: () => ipcRenderer.invoke('app:info'),
+  checkUpdates: () => ipcRenderer.invoke('app:check-updates'),
+  installUpdate: () => ipcRenderer.invoke('app:install-update'),
+  onUpdate: (fn: (s: unknown) => void) => {
+    const handler = (_: unknown, s: unknown) => fn(s);
+    ipcRenderer.on('update-status', handler);
+    return () => ipcRenderer.removeListener('update-status', handler);
+  },
 });

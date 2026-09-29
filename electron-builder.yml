@@ -1,6 +1,9 @@
-# Windows installer (spec 13 / 19): `npm run dist:win` on a Windows machine.
+# Windows installer and automatic updates.
+# Built by GitHub Actions (.github/workflows/release.yml) and published to GitHub Releases;
+# installed copies check there for new versions. To build locally on Windows: npm run dist:win
 appId: app.livingrepository.desktop
 productName: Living Repository
+copyright: Copyright © Revelry Valor
 directories:
   output: release
   buildResources: build
@@ -9,6 +12,7 @@ files:
   - package.json
 asar: true
 win:
+  icon: build/icon.png
   target:
     - target: nsis
       arch: [x64]
@@ -18,9 +22,12 @@ nsis:
   perMachine: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
+  createStartMenuShortcut: true
   shortcutName: Living Repository
-# Auto-update check (spec 19.1): configure a publish provider here when releases exist, e.g.
-# publish:
-#   provider: github
-#   owner: <owner>
-#   repo: <repo>
+  # Uninstalling never deletes your projects (they live in your Documents folder).
+  deleteAppDataOnUninstall: false
+publish:
+  provider: github
+  owner: Revelry-Valor
+  repo: Valors-Scholarship---Creative-Writing-Repository
+  releaseType: release

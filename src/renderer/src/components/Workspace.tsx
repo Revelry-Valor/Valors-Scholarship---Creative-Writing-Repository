@@ -21,6 +21,7 @@ import { ClaimsPage } from './Claims';
 import { ContradictionsPage } from './Contradictions';
 import { importLexicons } from './LexiconPanel';
 import { openTranscribe } from './Transcribe';
+import { UpdateBadge } from './UpdateBadge';
 import { SpellingSettings } from './SpellingSettings';
 import { setSpellingPrefs } from '../editor/spelling';
 import { newView, addType } from './ViewsSidebar';
@@ -593,6 +594,7 @@ function StatusBar({ onAuthor, theme, onTheme, onSpelling }: { onAuthor: () => v
       <button className="status-btn" onClick={onTheme} title="Theme">
         {theme === 'dark' ? '☾' : theme === 'light' ? '☀' : '◐'}
       </button>
+      <UpdateBadge />
       <button className="status-btn" onClick={onAuthor} title="Your name signs every block you write">
         ✍ author
       </button>

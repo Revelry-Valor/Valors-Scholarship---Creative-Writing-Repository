@@ -1,8 +1,18 @@
 // One client for both hosts: Electron (preload bridge) or the browser dev server.
 import type { BackendEvent, BackendMethods } from '../../backend/backend';
 
+export type UpdateStatus =
+  | { state: 'idle' | 'checking' | 'none' | 'dev' }
+  | { state: 'downloading'; version?: string; percent: number }
+  | { state: 'ready'; version: string }
+  | { state: 'error'; message: string };
+
 type Bridge = {
   platform: string;
+  appInfo?: () => Promise<{ version: string; packaged: boolean; status: UpdateStatus }>;
+  checkUpdates?: () => Promise<UpdateStatus>;
+  installUpdate?: () => Promise<void>;
+  onUpdate?: (fn: (s: UpdateStatus) => void) => () => void;
   call(method: string, args: unknown[]): Promise<{ ok: boolean; value?: unknown; error?: string }>;
   onEvent(fn: (e: BackendEvent) => void): () => void;
 };

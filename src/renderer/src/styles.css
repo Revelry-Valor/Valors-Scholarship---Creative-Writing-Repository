@@ -4289,3 +4289,8 @@ mark.hit {
 .fb-mic.on {
   color: var(--danger);
 }
+.status-btn.update-ready,
+.status-btn.update-downloading {
+  color: var(--accent);
+  font-weight: 600;
+}

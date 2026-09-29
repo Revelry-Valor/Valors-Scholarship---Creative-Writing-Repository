@@ -4,7 +4,19 @@ A writing environment for writers and scholars. You write naturally in one place
 
 This repository is the **Phase 1 (Core)** build of the *Living Repository — Program Specification*.
 
-## Running it
+## Install the beta (Windows)
+
+1. Go to **Releases** (right-hand side of the GitHub page) and open the newest one.
+2. Download `LivingRepository-Setup-<version>.exe` and run it.
+3. Windows may say *“Windows protected your PC”*, because the beta installer isn't code-signed yet: choose **More info → Run anyway**.
+
+The app checks for new versions when it starts and every few hours, downloads them in the background, and asks to restart. The version is shown in the status bar at the bottom; click it to check now. Your projects are ordinary folders in `Documents\Living Repository` and are never touched by an update or by uninstalling.
+
+## Releasing a new version
+
+Raise `"version"` in `package.json` (0.2.0 → 0.2.1) and merge to `main`. GitHub Actions (`.github/workflows/release.yml`) tests, builds the Windows installer and publishes it as a release; installed copies update themselves. The workflow can also be started by hand from the **Actions** tab.
+
+## Running it from source
 
 Requires Node.js 22+.
 
